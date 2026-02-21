@@ -687,6 +687,21 @@ var CITIES = [
     }
   },
   {
+    id: 'detroit',
+    name: 'Detroit, MI',
+    note: 'Non-Fatal Shootings (Manual)',
+    type: 'Non-Fatal',
+    manual: true,
+    dataUrl: 'https://detroitmi.gov/Calendar-and-Events?field_start_value=2026-02-19&title=&term_node_tid_depth=All&term_node_tid_depth_1=1676&term_node_tid_depth_2=All',
+    count: async function(s, e) {
+      var key = 'manual_' + this.id + '_' + s.slice(0,4);
+      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
+    },
+    latest: async function() {
+      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+    }
+  },
+  {
     id: 'durham',
     name: 'Durham, NC',
     note: 'Shooting Victims (Fatal + Non-Fatal, Manual)',
@@ -1201,7 +1216,7 @@ function render() {
 // ─── SUMMARY ──────────────────────────────────────────────────────────────────
 
 function updateSummary() {
-  var ok = Object.values(state).filter(function(s) { return s.status === 'ok'; });
+  var ok = Object.values(state).filter(function(s) { return s.status === 'ok' && ((s.ytd != null && s.ytd > 0) || (s.prior != null && s.prior > 0)); });
   var ytdTotal   = ok.reduce(function(n, s) { return n + (s.ytd   || 0); }, 0);
   var priorTotal = ok.reduce(function(n, s) { return n + (s.prior || 0); }, 0);
 
