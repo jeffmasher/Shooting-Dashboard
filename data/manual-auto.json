@@ -3,35 +3,35 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T22:10:28.621Z",
+    "fetchedAt": "2026-02-22T22:15:42.412Z",
     "ok": true
   },
   "durham": {
     "ytd": 12,
     "prior": 18,
     "asof": "2026-02-14",
-    "fetchedAt": "2026-02-22T22:10:28.621Z",
+    "fetchedAt": "2026-02-22T22:15:42.412Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 39,
     "prior": 54,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T22:10:28.621Z",
+    "fetchedAt": "2026-02-22T22:15:42.412Z",
     "ok": true
   },
   "memphis": {
     "ytd": 69,
     "prior": 92,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-22T22:10:28.621Z",
+    "fetchedAt": "2026-02-22T22:15:42.412Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
-    "asof": "2025-01-31",
-    "fetchedAt": "2026-02-22T22:10:28.621Z",
+    "asof": "2026-01-31",
+    "fetchedAt": "2026-02-22T22:15:42.412Z",
     "ok": true
   }
 }
