@@ -282,6 +282,49 @@ async function fetchWilmington() {
   return { ytd: nums[6], prior: nums[7], asof };
 }
 
+// ─── Hampton ──────────────────────────────────────────────────────────────────
+
+async function fetchHampton() {
+  const pdfUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
+  console.log('Hampton PDF URL:', pdfUrl);
+  const resp = await fetchUrl(pdfUrl);
+  if (resp.status !== 200) throw new Error(`Hampton PDF HTTP ${resp.status}`);
+
+  const rows = await extractPdfRows(resp.body);
+  console.log('Hampton rows:', rows.slice(0, 20));
+
+  // Date: "Jan. 1- 31, 2025 vs. Jan. 1- 31, 2026" or similar
+  let asof = null;
+  for (const row of rows) {
+    // Look for the later year's end date
+    const m = row.match(/vs\.\s*\w+[\.\s]+\d+[\s\-]+(\d+),?\s*(\d{4})/i);
+    if (m) {
+      // Find month from the "vs." part
+      const monthMatch = row.match(/vs\.\s*(\w+)/i);
+      const months = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+      const mo = monthMatch ? months[monthMatch[1].slice(0,3).toLowerCase()] : null;
+      if (mo) {
+        asof = `${m[2]}-${String(mo).padStart(2,'0')}-${String(parseInt(m[1])).padStart(2,'0')}`;
+        break;
+      }
+    }
+  }
+
+  // Find "Total Persons with Gunshot Injuries" row
+  const totalRow = rows.find(r => r.match(/Total\s+Persons\s+with\s+Gunshot/i));
+  if (!totalRow) throw new Error('Total row not found. Rows: ' + rows.join(' | '));
+  console.log('Hampton total row:', totalRow);
+
+  // Columns: label | YTD prior | YTD current | diff | %diff
+  const nums = [...totalRow.matchAll(/-?[\d,]+/g)]
+    .map(m => parseInt(m[0].replace(/,/g,'')))
+    .filter(n => !isNaN(n));
+  console.log('Hampton nums:', nums);
+
+  if (nums.length < 2) throw new Error(`Not enough numbers: ${nums.join(',')}`);
+  return { ytd: nums[1], prior: nums[0], asof };
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -306,6 +349,16 @@ async function main() {
   } catch (e) {
     console.error('Durham error:', e.message);
     results.durham = { ok: false, error: e.message, fetchedAt };
+  }
+
+  // Hampton
+  try {
+    console.log('\n--- Fetching Hampton ---');
+    results.hampton = { ...(await fetchHampton()), fetchedAt, ok: true };
+    console.log('Hampton:', results.hampton);
+  } catch (e) {
+    console.error('Hampton error:', e.message);
+    results.hampton = { ok: false, error: e.message, fetchedAt };
   }
 
   // Write output
