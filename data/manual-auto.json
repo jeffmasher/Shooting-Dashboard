@@ -1,20 +1,17 @@
 {
   "detroit": {
     "ok": false,
-    "error": "Non-Fatal Shooting row not found. Tokens: D|a|i|l|y|O|v|e|r|v|i|e|w|C|r|i|me|R|e|p|o|r|t|C|a|t|e|g|o|r|y|P|r|i|o|r|D|a|y|P|r|i|o|r|7D|a|y|s|2|0|2|6Y|T|D|2|0|2|5Y|T|D",
-    "fetchedAt": "2026-02-22T15:29:03.736Z"
+    "error": "Non-Fatal Shooting row not found. Tokens: DailyOverview|Cri|me|ReportCategory|PriorDay|Prior|7D|ays|202|6Y|TD|202|5Y|TD|Change|%|C|hangeCri|mi|nalHo|mi|cide|4|8|19|18|1|5.|6%|SexAssault|1|5|54|52|2|3.|8%|Aggravate|dA|ssault|19|163|1,021|967|54|5.|6%|Robbery|5|23|105|110|-5|-4.|5%|Burglary|8|64|416|579",
+    "fetchedAt": "2026-02-22T15:34:53.983Z"
   },
   "durham": {
-    "ytd": 4052,
-    "prior": 4050,
-    "asof": "2026-02-14",
-    "adid": 7554,
-    "fetchedAt": "2026-02-22T15:29:03.736Z",
-    "ok": true
+    "ok": false,
+    "error": "Could not parse Durham fatal/nonfatal nums. fatal3= nonfatal3= tokens=Durham|Police|Department|Shooting|Data|Year-to-Date|through|February|14,|2026|The|below|chart|compares|data|on|shooting|incidents|year-to-date|over|a|three-year|period.|A|shooting|incident|is|defined|as|an|event|reported|to|police|involving|the|criminal|discharge|of|a|firearm,|and|does|not|include|accidental|or|self-inflicted|shootings.|The",
+    "fetchedAt": "2026-02-22T15:34:53.983Z"
   },
   "milwaukee": {
     "ok": false,
     "error": "Cannot find module 'playwright'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
-    "fetchedAt": "2026-02-22T15:29:03.736Z"
+    "fetchedAt": "2026-02-22T15:34:53.983Z"
   }
 }
