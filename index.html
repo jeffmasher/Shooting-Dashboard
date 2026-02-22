@@ -1004,11 +1004,14 @@ var CITIES = [
       var apiKey = keyStore.value.trim();
       // Fetch the image via a CORS proxy
       var imgUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
-      var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(imgUrl);
+      var proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(imgUrl);
+      console.log('Hampton: fetching via proxy');
       var imgResp;
-      try { imgResp = await fetch(proxyUrl); } catch(e) { return null; }
-      if (!imgResp.ok) return null;
+      try { imgResp = await fetch(proxyUrl); } catch(e) { console.error('Hampton proxy error:', e); return null; }
+      console.log('Hampton proxy status:', imgResp.status);
+      if (!imgResp.ok) { console.error('Hampton proxy failed:', imgResp.status); return null; }
       var blob = await imgResp.blob();
+      console.log('Hampton blob size:', blob.size);
       var base64 = await new Promise(res => {
         var reader = new FileReader();
         reader.onloadend = () => res(reader.result.split(',')[1]);
@@ -1049,6 +1052,21 @@ var CITIES = [
     latest: async function() {
       var d = await this._fetchVision();
       if (d && d.asof) return d.asof;
+      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+    }
+  },
+  {
+    id: 'omaha',
+    name: 'Omaha, NE',
+    note: 'Shooting Victims (Manual)',
+    type: 'Victims',
+    manual: true,
+    dataUrl: 'https://police.cityofomaha.org/opd-crime-statistics',
+    count: async function(s, e) {
+      var key = 'manual_' + this.id + '_' + s.slice(0,4);
+      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
+    },
+    latest: async function() {
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
   },
