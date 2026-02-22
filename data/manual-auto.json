@@ -3,7 +3,7 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T01:58:44.396Z",
+    "fetchedAt": "2026-02-22T02:04:37.391Z",
     "ok": true
   },
   "durham": {
@@ -11,12 +11,7 @@
     "prior": 21,
     "asof": "2026-02-14",
     "adid": 7554,
-    "fetchedAt": "2026-02-22T01:58:44.396Z",
+    "fetchedAt": "2026-02-22T02:04:37.391Z",
     "ok": true
-  },
-  "wilmington": {
-    "ok": false,
-    "error": "Wilmington page HTTP 403",
-    "fetchedAt": "2026-02-22T01:58:44.396Z"
   }
 }
