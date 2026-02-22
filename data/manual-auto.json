@@ -3,7 +3,7 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T02:04:37.391Z",
+    "fetchedAt": "2026-02-22T02:30:12.604Z",
     "ok": true
   },
   "durham": {
@@ -11,7 +11,12 @@
     "prior": 21,
     "asof": "2026-02-14",
     "adid": 7554,
-    "fetchedAt": "2026-02-22T02:04:37.391Z",
+    "fetchedAt": "2026-02-22T02:30:12.604Z",
     "ok": true
+  },
+  "hampton": {
+    "ok": false,
+    "error": "Invalid PDF structure.",
+    "fetchedAt": "2026-02-22T02:30:12.604Z"
   }
 }
