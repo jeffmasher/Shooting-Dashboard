@@ -343,12 +343,20 @@ var CITIES = [
     _url: 'https://data.cityofchicago.org/resource/gumc-mgzr.json',
     count: async function(s, e) {
       var where = "date >= '" + s + "T00:00:00.000' AND date <= '" + e + "T23:59:59.000' AND gunshot_injury_i = 'YES'";
-      var url = this._url;
-      var q = url + '?$where=' + encodeURIComponent(where) + '&$select=count(*)%20as%20n&$limit=1';
+      var q = this._url + '?$where=' + encodeURIComponent(where) + '&$select=count(*)%20as%20n&$limit=1';
       var r = await fetch(q, { signal: AbortSignal.timeout(15000) });
       if (!r.ok) throw new Error('HTTP ' + r.status);
       var d = await r.json();
       return parseInt(d[0] && d[0].n ? d[0].n : 0);
+    },
+    latest: async function() {
+      var q = this._url + '?$order=date%20DESC&$limit=1&$select=date&$where=' + encodeURIComponent("gunshot_injury_i = 'YES'");
+      try {
+        var r = await fetch(q, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return null;
+        var d = await r.json();
+        return d[0] && d[0].date ? d[0].date.slice(0, 10) : null;
+      } catch(e) { return null; }
     }
   },
   {
