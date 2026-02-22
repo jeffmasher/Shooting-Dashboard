@@ -1,15 +1,17 @@
 {
   "detroit": {
-    "ok": false,
-    "error": "Non-Fatal Shooting row not found. Rows: DailyOverview  Crime Report | Thursday,February19,2026 | ChiefToddA.Bettison | Category  PriorDay  Prior7Days  2026YTD  2025YTD  Change  % Change | CriminalHomicide  4  8  19  18  1  5.6% | SexAssault  1  5  54  52  2  3.8% | AggravatedAssault  19  163  1,021  967  54  5.6% | Robbery  5  23  105  110  -5  -4.5% | Burglary  8  64  416  579  -163  -28.2% | Larceny  21  170  1,481  1,771  -290  -16.4% | MotorVehicleTheft  6  85  550  777  -227  -29.2% | PartIViolent  29  199  1,199  1,147  52  4.5% | PartIProperty  35  319  2,447  3,127  -680  -21.7% | PartITotal | 64  518  3,646  4,274  -628  -14.7% | Non-FatalShooting  3  5  34  50  -16  -32.0% | Carjacking  0  1  9  13  -4  -30.8% | EastsidePrecincts | ArnoldWilliams,D.C. | Category  PriorDay  Prior7Days  2026YTD  2025YTD  Change  % Change | CriminalHomicide  1  3  7  3  4  133.3% | SexAssault  1  1  24  26  -2  -7.7% | AggravatedAssault  11  57  421  389  32  8.2% | Robbery  1  8  42  42  0  0.0% | Burglary  2  29  168  248  -80  -32.3% | Larceny  11  67  688  874  -186  -21.3% | MotorVehicleTheft  3  38  260  372  -112  -30.1% | PartIViolent  17  74  506  475  31  6.5% | PartIProperty  16  134  1,116  1,494  -378  -25.3% | PartITotal  33  208  1,622  1,969  -347  -17.6% | Non-FatalShooting  1  1  6  17  -11  -64.7% | Carjacking  0  0  2  4  -2  -50.0% | WestsidePrecincts | JacquelinePrichett,D.C. | Category  PriorDay  Prior7Days  2026YTD  2025YTD  Change  % Change | CriminalHomicide  3  5  12  15  -3  -20.0% | SexAssault  0  4  30  26  4  15.4% | AggravatedAssault  8  106  600  578  22  3.8% | Robbery  4  15  62  68  -6  -8.8% | Burglary  6  35  248  331  -83  -25.1% | Larceny  10  102  792  897  -105  -11.7% | MotorVehicleTheft  3  47  289  405  -116  -28.6% | PartIViolent  16  133  711  690  21  3.0% | PartIProperty  19  184  1,329  1,633  -304  -18.6% | PartITotal | 35  317  2,040  2,323  -283  -12.2% | Non-FatalShooting  2  4  28  33  -5  -15.2% | Carjacking  0  1  7  9  -2  -22.2% | Notes:CriminalHomicide,SexAssault,AggravatedAssault,andNon-FatalShootingarecountedbyvictim.Robbery,Carjacking,Burglary,and | Larcenyarecountedbyoffense.MotorVehicleTheftiscountedbyvehicle.ThisPRELIMINARYINFORMATIONisusedforstrategicplanningand | crimeanalysisandissubjecttochange.RMSdatarefreshedat2/19/202670124AM.",
-    "fetchedAt": "2026-02-22T01:16:24.669Z"
+    "ytd": 34,
+    "prior": 50,
+    "asof": null,
+    "fetchedAt": "2026-02-22T01:18:50.994Z",
+    "ok": true
   },
   "durham": {
-    "ytd": 4,
-    "prior": 7,
+    "ytd": 18,
+    "prior": 21,
     "asof": "2026-02-14",
     "adid": 7554,
-    "fetchedAt": "2026-02-22T01:16:24.669Z",
+    "fetchedAt": "2026-02-22T01:18:50.994Z",
     "ok": true
   }
 }
