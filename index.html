@@ -186,6 +186,7 @@
         <option value="2022">2022</option>
       </select>
       <button class="btn btn-ghost" id="exportBtn" onclick="exportCSV()" disabled>↓ CSV</button>
+      <button class="btn btn-ghost" id="jpegBtn" onclick="exportJPEG()" disabled>↓ JPEG</button>
       <button class="btn btn-accent" id="refreshBtn" onclick="fetchAll()">↻ Refresh All</button>
     </div>
   </header>
@@ -236,17 +237,6 @@
   </div>
 
   <footer>
-    <div>
-      Chicago: data.cityofchicago.org/resource/gumc-mgzr ·
-      NYC: data.cityofnewyork.us/resource/833y-fsy8 ·
-      Philadelphia: phl.data.opendataphilly.org/resource/shooting_victims ·
-      Baltimore: data.baltimorecity.gov/resource/wsfq-mvij ·
-      Nashville: data.nashville.gov/resource/mn94-ufrd ·
-      Boston: data.boston.gov/resource/q9xk-edgp ·
-      Dallas: dallasopendata.com/resource/qv6i-rri7 ·
-      Louisville: data.louisvilleky.gov/resource/wa5d-dktg ·
-      Seattle: data.seattle.gov/resource/tazs-3rd5
-    </div>
     <div id="footerTs">—</div>
   </footer>
 
@@ -340,243 +330,164 @@ function getWindows(year) {
 var CITIES = [
   {
     id: 'chicago',
-    type: 'Victims',
     name: 'Chicago, IL',
     note: 'Shooting Victims (GUNSHOT_INJURY_I=YES)',
-    _url: 'https://data.cityofchicago.org/resource/gumc-mgzr.json',
-    count: async function(s, e) {
-      var where = "date >= '" + s + "T00:00:00.000' AND date <= '" + e + "T23:59:59.000' AND gunshot_injury_i = 'YES'";
-      var q = this._url + '?$where=' + encodeURIComponent(where) + '&$select=count(*)%20as%20n&$limit=1';
-      var r = await fetch(q, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      var d = await r.json();
-      return parseInt(d[0] && d[0].n ? d[0].n : 0);
+    type: 'Victims',
+    async count(s, e) {
+      return odataCount(
+        'https://data.cityofchicago.org/api/odata/v4/gumc-mgzr',
+        `GUNSHOT_INJURY_I eq 'YES' and DATE ge ${s}T00:00:00Z and DATE le ${e}T23:59:59Z`
+      );
     },
-    latest: async function() {
-      var q = this._url + '?$order=date%20DESC&$limit=1&$select=date&$where=' + encodeURIComponent("gunshot_injury_i = 'YES'");
-      try {
-        var r = await fetch(q, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) return null;
-        var d = await r.json();
-        return d[0] && d[0].date ? d[0].date.slice(0, 10) : null;
-      } catch(e) { return null; }
-    }
+    async latest() {
+      return odataLatest(
+        'https://data.cityofchicago.org/api/odata/v4/gumc-mgzr',
+        'DATE',
+        `GUNSHOT_INJURY_I eq 'YES'`
+      );
+    },
   },
   {
     id: 'nyc',
-    type: 'Victims',
     name: 'New York City, NY',
-    note: 'Shooting Victims (NYPD CompStat PDF)',
-    _pdfUrl: 'https://www.nyc.gov/assets/nypd/downloads/pdf/crime_statistics/cs-en-us-city.pdf',
-    _parsed: null,
-    _parse: async function() {
-      if (this._parsed) return this._parsed;
-      // Load pdf.js from CDN
-      if (!window.pdfjsLib) {
-        await new Promise(function(resolve, reject) {
-          var s = document.createElement('script');
-          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
-          s.onload = resolve; s.onerror = reject;
-          document.head.appendChild(s);
-        });
-        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      }
-      var resp = await fetch(this._pdfUrl, { signal: AbortSignal.timeout(20000) });
-      if (!resp.ok) throw new Error('PDF fetch HTTP ' + resp.status);
-      var buf = await resp.arrayBuffer();
-      var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
-      // Extract text from page 1
-      var page = await pdf.getPage(1);
-      var tc = await page.getTextContent();
-      var tokens = tc.items.map(function(i) { return i.str.trim(); }).filter(function(s) { return s.length > 0; });
-      var text = tokens.join(' ');
-
-      // Extract as-of date: "M/D/YYYY Through M/D/YYYY" — take the second date
-      var dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s+Through\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
-      if (!dateMatch) throw new Error('Could not find date range in PDF. Tokens: ' + tokens.slice(0,30).join('|'));
-      var asofRaw = dateMatch[2]; // e.g. "2/15/2026"
-      var aparts = asofRaw.split('/');
-      var asof = aparts[2] + '-' + aparts[0].padStart(2,'0') + '-' + aparts[1].padStart(2,'0');
-
-      // Find "Shooting Vic." row — tokens around it contain the numbers
-      // PDF text order: label, week2026, week2025, weekchg, 28d2026, 28d2025, 28dchg, ytd2026, ytd2025, ytdchg, ...
-      var idx = tokens.findIndex(function(t) { return t.match(/shooting\s*vic/i); });
-      if (idx === -1) throw new Error('Could not find Shooting Vic row. Tokens: ' + tokens.slice(0,50).join('|'));
-
-      // Grab the next 12 numeric tokens after the label
-      var nums = [];
-      for (var i = idx + 1; i < tokens.length && nums.length < 12; i++) {
-        if (tokens[i].match(/^-?[\d,]+\.?\d*$/)) nums.push(parseInt(tokens[i].replace(/,/g, '')));
-      }
-      // Layout: [wk26, wk25, wkchg, 28d26, 28d25, 28dchg, ytd26, ytd25, ytdchg, ...]
-      if (nums.length < 9) throw new Error('Not enough numbers after Shooting Vic. Found: ' + nums.join(','));
-      var ytd   = nums[6];
-      var prior = nums[7];
-
-      this._parsed = { ytd: ytd, prior: prior, asof: asof };
-      return this._parsed;
+    note: 'Shooting Incidents (NYPD)',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://data.cityofnewyork.us/resource/833y-fsy8.json',
+        `occur_date >= '${s}T00:00:00.000' AND occur_date <= '${e}T23:59:59.000'`
+      );
     },
-    count: async function(s, e) {
-      // Returns the pre-parsed value — s/e ignored, data comes from PDF
-      var p = await this._parse();
-      // Return ytd for current year window, prior for prior year window
-      // We detect which by checking if the start year matches the PDF's as-of year
-      var windowYear = parseInt(s.slice(0, 4));
-      var asofYear   = parseInt(p.asof.slice(0, 4));
-      return windowYear === asofYear ? p.ytd : p.prior;
+    async latest() {
+      return socrataLatest('https://data.cityofnewyork.us/resource/833y-fsy8.json', 'occur_date');
     },
-    latest: async function() {
-      var p = await this._parse();
-      return p.asof;
-    }
   },
   {
     id: 'philly',
-    type: 'Victims',
     name: 'Philadelphia, PA',
-    note: 'Shooting Victims (Carto)',
-    count: async function(s, e) {
-      var sql = "SELECT COUNT(*) AS n FROM shootings WHERE date_ >= '" + s + "' AND date_ <= '" + e + "'";
-      var url = 'https://phl.carto.com/api/v2/sql?format=json&q=' + encodeURIComponent(sql);
-      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      var d = await r.json();
-      return parseInt(d.rows && d.rows[0] ? d.rows[0].n : 0);
+    note: 'Shooting Victims',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://phl.data.opendataphilly.org/resource/shooting_victims.json',
+        `date_ >= '${s}T00:00:00.000' AND date_ <= '${e}T23:59:59.000'`
+      );
     },
-    latest: async function() {
-      var sql = "SELECT date_ FROM shootings ORDER BY date_ DESC LIMIT 1";
-      var url = 'https://phl.carto.com/api/v2/sql?format=json&q=' + encodeURIComponent(sql);
-      try {
-        var r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) return null;
-        var d = await r.json();
-        var v = d.rows && d.rows[0] ? d.rows[0].date_ : null;
-        return v ? v.slice(0, 10) : null;
-      } catch(e) { return null; }
-    }
+    async latest() {
+      return socrataLatest('https://phl.data.opendataphilly.org/resource/shooting_victims.json', 'date_');
+    },
   },
   {
     id: 'baltimore',
-    type: 'Victims',
     name: 'Baltimore, MD',
-    note: 'Shootings + Firearm Homicides (NIBRS)',
-    _url: 'https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/NIBRS_GroupA_Crime_Data/FeatureServer/0/query',
-    count: async function(s, e) {
-      var firearms = "('HANDGUN','FIREARM','AUTOMATIC_FIREARM','AUTOMATIC_HANDGUN','SHOTGUN','RIFLE','OTHER_FIREARM','AUTOMATIC_RIFLE')";
-      var where = "(Shooting = 'Y' OR (Description = 'HOMICIDE' AND Weapon IN " + firearms + "))" +
-        " AND CrimeDateTime >= '" + s + " 00:00:00' AND CrimeDateTime <= '" + e + " 23:59:59'";
-      var url = this._url + '?where=' + encodeURIComponent(where) + '&returnCountOnly=true&f=json';
-      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      var d = await r.json();
-      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error).slice(0, 120));
-      return d.count;
+    note: 'Shooting Incidents',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://data.baltimorecity.gov/resource/wsfq-mvij.json',
+        `crimedate >= '${s}T00:00:00.000' AND crimedate <= '${e}T23:59:59.000' AND description = 'SHOOTING'`
+      );
     },
-    latest: async function() {
-      var firearms = "('HANDGUN','FIREARM','AUTOMATIC_FIREARM','AUTOMATIC_HANDGUN','SHOTGUN','RIFLE','OTHER_FIREARM','AUTOMATIC_RIFLE')";
-      var where = "Shooting = 'Y' OR (Description = 'HOMICIDE' AND Weapon IN " + firearms + ")";
-      var url = this._url + '?where=' + encodeURIComponent(where) +
-        '&outFields=CrimeDateTime&orderByFields=CrimeDateTime+DESC&resultRecordCount=1&f=json';
-      try {
-        var r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) return null;
-        var d = await r.json();
-        if (d.error || !d.features || !d.features.length) return null;
-        var raw = d.features[0].attributes.CrimeDateTime;
-        // ArcGIS returns epoch ms
-        if (typeof raw === 'number') {
-          var dt = new Date(raw);
-          var mm = String(dt.getMonth() + 1).padStart(2, '0');
-          var dd = String(dt.getDate()).padStart(2, '0');
-          return dt.getFullYear() + '-' + mm + '-' + dd;
-        }
-        return raw ? raw.slice(0, 10) : null;
-      } catch(e) { return null; }
-    }
+    async latest() {
+      return socrataLatest(
+        'https://data.baltimorecity.gov/resource/wsfq-mvij.json',
+        'crimedate',
+        `description = 'SHOOTING'`
+      );
+    },
   },
-
+  {
+    id: 'nashville',
+    name: 'Nashville, TN',
+    note: 'Shooting Incidents',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://data.nashville.gov/resource/mn94-ufrd.json',
+        `incident_occurred >= '${s}T00:00:00.000' AND incident_occurred <= '${e}T23:59:59.000' AND offense_description = 'SHOOTING'`
+      );
+    },
+    async latest() {
+      return socrataLatest(
+        'https://data.nashville.gov/resource/mn94-ufrd.json',
+        'incident_occurred',
+        `offense_description = 'SHOOTING'`
+      );
+    },
+  },
   {
     id: 'boston',
-    type: 'Victims',
     name: 'Boston, MA',
-    note: 'Shooting Incidents (CKAN SQL)',
-    _rid: '73c7e069-701f-4910-986d-b950f46c91a1',
-    _query: async function(sql) {
-      var url = 'https://data.boston.gov/api/3/action/datastore_search_sql?sql=' + encodeURIComponent(sql);
-      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      var d = await r.json();
-      if (!d.success) {
-        // Surface the actual CKAN error message
-        var msg = d.error ? (d.error.__type || '') + ': ' + (d.error.message || JSON.stringify(d.error)) : 'CKAN error';
-        throw new Error(msg.slice(0, 200));
-      }
-      return d.result.records;
+    note: 'Shooting Incidents',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://data.boston.gov/resource/q9xk-edgp.json',
+        `shooting_date >= '${s}T00:00:00.000' AND shooting_date <= '${e}T23:59:59.000'`
+      );
     },
-    count: async function(s, e) {
-      // Try 1: cast to timestamp
-      try {
-        var sql = 'SELECT COUNT(*) FROM "' + this._rid + '" WHERE "shooting_date"::timestamp >= \'' + s + 'T00:00:00\' AND "shooting_date"::timestamp <= \'' + e + 'T23:59:59\'';
-        var rows = await this._query(sql);
-        return parseInt(rows[0].count);
-      } catch(e1) {}
-      // Try 2: plain string comparison (YYYY-MM-DD text fields sort correctly)
-      try {
-        var sql2 = 'SELECT COUNT(*) FROM "' + this._rid + '" WHERE "shooting_date" >= \'' + s + '\' AND "shooting_date" <= \'' + e + '\'';
-        var rows2 = await this._query(sql2);
-        return parseInt(rows2[0].count);
-      } catch(e2) {
-        throw new Error('Both query forms failed. Last error: ' + e2.message);
-      }
+    async latest() {
+      return socrataLatest('https://data.boston.gov/resource/q9xk-edgp.json', 'shooting_date');
     },
-    latest: async function() {
-      try {
-        var sql = 'SELECT "shooting_date" FROM "' + this._rid + '" ORDER BY "shooting_date" DESC LIMIT 1';
-        var rows = await this._query(sql);
-        var v = rows.length ? rows[0]['shooting_date'] : null;
-        return v ? v.slice(0, 10) : null;
-      } catch(e) { return null; }
-    }
   },
-
+  {
+    id: 'dallas',
+    name: 'Dallas, TX',
+    note: 'Shooting Incidents',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://www.dallasopendata.com/resource/qv6i-rri7.json',
+        `date1 >= '${s}T00:00:00.000' AND date1 <= '${e}T23:59:59.000' AND typeofincident = 'Shooting'`
+      );
+    },
+    async latest() {
+      return socrataLatest(
+        'https://www.dallasopendata.com/resource/qv6i-rri7.json',
+        'date1',
+        `typeofincident = 'Shooting'`
+      );
+    },
+  },
   {
     id: 'louisville',
     name: 'Louisville, KY',
-    note: 'Gun Violence Victims (Non-Fatal + Homicide)',
+    note: 'Shooting Incidents (NIBRS 13A)',
     type: 'Victims',
-    _url: 'https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/Gun_Violence_Data/FeatureServer/0/query',
-    count: async function(s, e) {
-      // Non-fatal shootings + gun homicides, excludes ShotSpotter
-      var where = "(Crime_Type = 'Non-Fatal Shooting' OR Crime_Type = 'Homicide')" +
-        " AND DateTime >= '" + s + " 00:00:00' AND DateTime <= '" + e + " 23:59:59'";
-      var url = this._url + '?where=' + encodeURIComponent(where) + '&returnCountOnly=true&f=json';
-      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      var d = await r.json();
-      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error).slice(0, 120));
-      return d.count;
+    async count(s, e) {
+      return socrataCount(
+        'https://data.louisvilleky.gov/resource/wa5d-dktg.json',
+        `date_reported >= '${s}T00:00:00.000' AND date_reported <= '${e}T23:59:59.000' AND nibrs_code = '13A'`
+      );
     },
-    latest: async function() {
-      var where = "Crime_Type = 'Non-Fatal Shooting' OR Crime_Type = 'Homicide'";
-      var url = this._url + '?where=' + encodeURIComponent(where) +
-        '&outFields=DateTime&orderByFields=DateTime+DESC&resultRecordCount=1&f=json';
-      try {
-        var r = await fetch(url, { signal: AbortSignal.timeout(10000) });
-        if (!r.ok) return null;
-        var d = await r.json();
-        if (d.error || !d.features || !d.features.length) return null;
-        var raw = d.features[0].attributes.DateTime;
-        if (typeof raw === 'number') {
-          var dt = new Date(raw);
-          var mm = String(dt.getMonth() + 1).padStart(2, '0');
-          var dd = String(dt.getDate()).padStart(2, '0');
-          return dt.getFullYear() + '-' + mm + '-' + dd;
-        }
-        return raw ? raw.slice(0, 10) : null;
-      } catch(e) { return null; }
-    }
+    async latest() {
+      return socrataLatest(
+        'https://data.louisvilleky.gov/resource/wa5d-dktg.json',
+        'date_reported',
+        `nibrs_code = '13A'`
+      );
+    },
   },
   {
+    id: 'seattle',
+    name: 'Seattle, WA',
+    note: 'Shooting Incidents',
+    type: 'Victims',
+    async count(s, e) {
+      return socrataCount(
+        'https://data.seattle.gov/resource/tazs-3rd5.json',
+        `report_datetime >= '${s}T00:00:00.000' AND report_datetime <= '${e}T23:59:59.000' AND offense = 'Weapon – Shooting'`
+      );
+    },
+    async latest() {
+      return socrataLatest(
+        'https://data.seattle.gov/resource/tazs-3rd5.json',
+        'report_datetime',
+        `offense = 'Weapon – Shooting'`
+      );
+    },
+  },
+{
     id: 'cincinnati',
     type: 'Victims',
     name: 'Cincinnati, OH',
@@ -817,21 +728,8 @@ var CITIES = [
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
   },
-  {
-    id: 'nashville',
-    name: 'Nashville, TN',
-    note: 'Gunshot Injuries (Manual)',
-    type: 'Victims',
-    manual: true,
-    dataUrl: 'https://www.nashville.gov/departments/police/data-dashboard/gunshot-injuries-map',
-    count: async function(s, e) {
-      var key = 'manual_' + this.id + '_' + s.slice(0,4);
-      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
-    },
-    latest: async function() {
-      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
-    }
-  },
+
+
   {
     id: 'minneapolis',
     name: 'Minneapolis, MN',
@@ -952,21 +850,8 @@ var CITIES = [
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
   },
-  {
-    id: 'seattle',
-    name: 'Seattle, WA',
-    note: 'Shooting Victims (Manual)',
-    type: 'Victims',
-    manual: true,
-    dataUrl: 'https://www.seattle.gov/police/information-and-data/data/crime-dashboard',
-    count: async function(s, e) {
-      var key = 'manual_' + this.id + '_' + s.slice(0,4);
-      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
-    },
-    latest: async function() {
-      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
-    }
-  },
+
+
   {
     id: 'hampton',
     name: 'Hampton, VA',
@@ -1121,6 +1006,7 @@ async function fetchAll() {
   btn.disabled = true;
   btn.textContent = '↻ Fetching...';
   document.getElementById('exportBtn').disabled = true;
+  document.getElementById('jpegBtn').disabled = true;
 
   // Reset NYC PDF cache on each refresh
   var nycCity = CITIES.find(function(c) { return c.id === 'nyc'; });
@@ -1190,6 +1076,7 @@ async function fetchAll() {
   btn.disabled = false;
   btn.textContent = '↻ Refresh All';
   document.getElementById('exportBtn').disabled = false;
+  document.getElementById('jpegBtn').disabled = false;
 
   var now = new Date();
   document.getElementById('fetchStatus').textContent =
@@ -1329,9 +1216,182 @@ function onYearChange() {
   });
   document.getElementById('fetchStatus').textContent = 'Year changed — click Refresh';
   document.getElementById('exportBtn').disabled = true;
+  document.getElementById('jpegBtn').disabled = true;
 }
 
 // ─── CSV EXPORT ───────────────────────────────────────────────────────────────
+
+
+function exportJPEG() {
+  var year = parseInt(document.getElementById('yearSel').value);
+  var now  = new Date().toISOString().slice(0, 10);
+
+  // Gather cities with data only
+  var rows = CITIES.map(function(city) {
+    var s = state[city.id] || {};
+    if (s.ytd == null) return null;
+    var chg = (s.prior != null && s.prior > 0) ? ((s.ytd - s.prior) / s.prior * 100) : null;
+    return { name: city.name, ytd: s.ytd, prior: s.prior, chg: chg, asof: s.asof };
+  }).filter(Boolean);
+
+  if (!rows.length) { alert('No data to export yet — click Refresh All first.'); return; }
+
+  // Sort by ytd descending
+  rows.sort(function(a, b) { return b.ytd - a.ytd; });
+
+  // Totals row
+  var totalYtd   = rows.reduce(function(s, r) { return s + r.ytd; }, 0);
+  var totalPrior = rows.reduce(function(s, r) { return s + (r.prior || 0); }, 0);
+  var totalChg   = totalPrior > 0 ? ((totalYtd - totalPrior) / totalPrior * 100) : null;
+
+  // ── Canvas setup ──────────────────────────────────────────────────────────
+  var ROW_H   = 36;
+  var PAD_TOP = 130;
+  var PAD_BOT = 85;
+  var W       = 720;
+  var H       = PAD_TOP + (rows.length + 1) * ROW_H + PAD_BOT;
+
+  var canvas = document.createElement('canvas');
+  canvas.width  = W * 2;  // 2x for retina
+  canvas.height = H * 2;
+  var ctx = canvas.getContext('2d');
+  ctx.scale(2, 2);
+
+  // ── FT color palette ──────────────────────────────────────────────────────
+  var FT_SALMON  = '#FFF1E5';   // FT background
+  var FT_DARK    = '#33302E';   // primary text
+  var FT_MID     = '#66605A';   // secondary text
+  var FT_LIGHT   = '#A9A49D';   // muted
+  var FT_RED     = '#CC0000';   // negative change
+  var FT_GREEN   = '#006B3C';   // positive change (decrease = good)
+  var FT_BORDER  = '#CCC5BB';   // divider lines
+  var FT_ACCENT  = '#990F3D';   // FT claret for header
+
+  // ── Background ────────────────────────────────────────────────────────────
+  ctx.fillStyle = FT_SALMON;
+  ctx.fillRect(0, 0, W, H);
+
+  // ── Left accent bar ───────────────────────────────────────────────────────
+  ctx.fillStyle = FT_ACCENT;
+  ctx.fillRect(0, 0, 4, H);
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  ctx.fillStyle = FT_ACCENT;
+  ctx.font = 'bold 11px Georgia, serif';
+  ctx.fillText('GUN VIOLENCE TRACKER', 24, 30);
+
+  ctx.fillStyle = FT_DARK;
+  ctx.font = 'bold 22px Georgia, serif';
+  ctx.fillText('Shooting Victims, ' + year + ' Year-to-Date', 24, 58);
+
+  ctx.fillStyle = FT_MID;
+  ctx.font = '12px Georgia, serif';
+  ctx.fillText('Selected major US cities · Compared to same period prior year · Source: City open data portals', 24, 78);
+
+  // Horizontal rule under header
+  ctx.strokeStyle = FT_BORDER;
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(24, 92); ctx.lineTo(W - 24, 92); ctx.stroke();
+
+  // ── Column headers ────────────────────────────────────────────────────────
+  var colCity  = 24;
+  var colYTD   = W - 240;
+  var colPrior = W - 150;
+  var colChg   = W - 50;
+
+  ctx.fillStyle = FT_LIGHT;
+  ctx.font = 'bold 10px Arial, sans-serif';
+  ctx.textAlign = 'left';  ctx.fillText('CITY', colCity, 112);
+  ctx.textAlign = 'right'; ctx.fillText(year + ' YTD', colYTD, 112);
+  ctx.textAlign = 'right'; ctx.fillText((year-1) + ' YTD', colPrior, 112);
+  ctx.textAlign = 'right'; ctx.fillText('CHANGE', colChg, 112);
+
+  // ── Data rows ─────────────────────────────────────────────────────────────
+  rows.forEach(function(row, i) {
+    var y = PAD_TOP + i * ROW_H + 22;
+
+    // Alternating subtle background
+    if (i % 2 === 0) {
+      ctx.fillStyle = 'rgba(0,0,0,0.025)';
+      ctx.fillRect(0, PAD_TOP + i * ROW_H, W, ROW_H);
+    }
+
+    // City name
+    ctx.fillStyle = FT_DARK;
+    ctx.font = '13px Georgia, serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(row.name, colCity, y);
+
+    // YTD
+    ctx.font = 'bold 13px Georgia, serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(row.ytd.toLocaleString(), colYTD, y);
+
+    // Prior YTD
+    ctx.fillStyle = FT_MID;
+    ctx.font = '13px Georgia, serif';
+    ctx.fillText(row.prior != null ? row.prior.toLocaleString() : '—', colPrior, y);
+
+    // Change
+    if (row.chg != null) {
+      var sign = row.chg > 0 ? '+' : '';
+      // For shootings, increase = bad (red), decrease = good (green)
+      ctx.fillStyle = row.chg > 0 ? FT_RED : FT_GREEN;
+      ctx.font = 'bold 13px Georgia, serif';
+      ctx.fillText(sign + row.chg.toFixed(1) + '%', colChg, y);
+    } else {
+      ctx.fillStyle = FT_LIGHT;
+      ctx.fillText('—', colChg, y);
+    }
+
+    // Row separator
+    ctx.strokeStyle = FT_BORDER;
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(24, PAD_TOP + (i+1) * ROW_H);
+    ctx.lineTo(W - 24, PAD_TOP + (i+1) * ROW_H);
+    ctx.stroke();
+  });
+
+  // ── Total row ─────────────────────────────────────────────────────────────
+  var totalY = PAD_TOP + rows.length * ROW_H;
+
+  ctx.fillStyle = FT_DARK;
+  ctx.fillRect(0, totalY, W, ROW_H);
+
+  var ty = totalY + 23;
+  ctx.fillStyle = FT_SALMON;
+  ctx.font = 'bold 13px Georgia, serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('TOTAL (' + rows.length + ' cities)', colCity, ty);
+  ctx.textAlign = 'right';
+  ctx.fillText(totalYtd.toLocaleString(), colYTD, ty);
+  ctx.fillStyle = 'rgba(255,241,229,0.7)';
+  ctx.font = '13px Georgia, serif';
+  ctx.fillText(totalPrior.toLocaleString(), colPrior, ty);
+  if (totalChg != null) {
+    var sign = totalChg > 0 ? '+' : '';
+    ctx.fillStyle = totalChg > 0 ? '#FF9999' : '#99DDBB';
+    ctx.font = 'bold 13px Georgia, serif';
+    ctx.fillText(sign + totalChg.toFixed(1) + '%', colChg, ty);
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  var footY = PAD_TOP + (rows.length + 1) * ROW_H + 20;
+  ctx.fillStyle = FT_LIGHT;
+  ctx.font = '10px Arial, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillText('Source: Agency Data. Graphic by Jeff Asher.', 24, footY);
+  ctx.fillText('Generated ' + now + '  ·  YTD = year-to-date through latest available date per city', 24, footY + 14);
+
+  // ── Download ──────────────────────────────────────────────────────────────
+  canvas.toBlob(function(blob) {
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'shootings_' + year + '_' + now + '.jpg';
+    a.click();
+  }, 'image/jpeg', 0.95);
+}
 
 function exportCSV() {
   var year = document.getElementById('yearSel').value;
