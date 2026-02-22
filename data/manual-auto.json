@@ -1,22 +1,20 @@
 {
   "detroit": {
-    "ytd": 34,
-    "prior": 50,
-    "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T12:24:28.887Z",
-    "ok": true
+    "ok": false,
+    "error": "Non-Fatal Shooting row not found. Tokens: D|a|i|l|y|O|v|e|r|v|i|e|w|C|r|i|me|R|e|p|o|r|t|C|a|t|e|g|o|r|y|P|r|i|o|r|D|a|y|P|r|i|o|r|7D|a|y|s|2|0|2|6Y|T|D|2|0|2|5Y|T|D",
+    "fetchedAt": "2026-02-22T15:29:03.736Z"
   },
   "durham": {
-    "ytd": 18,
-    "prior": 21,
+    "ytd": 4052,
+    "prior": 4050,
     "asof": "2026-02-14",
     "adid": 7554,
-    "fetchedAt": "2026-02-22T12:24:28.887Z",
+    "fetchedAt": "2026-02-22T15:29:03.736Z",
     "ok": true
   },
-  "hampton": {
+  "milwaukee": {
     "ok": false,
-    "error": "ANTHROPIC_API_KEY not set",
-    "fetchedAt": "2026-02-22T12:24:28.887Z"
+    "error": "Cannot find module 'playwright'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
+    "fetchedAt": "2026-02-22T15:29:03.736Z"
   }
 }
