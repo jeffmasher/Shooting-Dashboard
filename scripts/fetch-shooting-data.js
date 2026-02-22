@@ -45,7 +45,7 @@ function fetchUrl(targetUrl, timeoutMs = 20000) {
 
 async function extractPdfTokens(buffer, pageNum = 1) {
   // pdfjs-dist is installed at repo root (node_modules/)
-  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
   pdfjsLib.GlobalWorkerOptions.workerSrc = false;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
   const page = await pdf.getPage(pageNum);
@@ -144,7 +144,7 @@ async function fetchDurham() {
   if (pdfResp.status !== 200) throw new Error(`Durham PDF HTTP ${pdfResp.status}`);
 
   // Try page 1 for the date, then scan all pages for the data table
-  const pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js');
+  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
   pdfjsLib.GlobalWorkerOptions.workerSrc = false;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfResp.body) }).promise;
   const numPages = pdf.numPages;
@@ -222,7 +222,7 @@ async function fetchMilwaukee() {
 
   console.log('Milwaukee: loading Tableau dashboard...');
   await page.goto(
-    'https://public.tableau.com/views/MilwaukeePoliceDepartment-PartICrimes/MPDPublicCrimeDashboard',
+    'https://public.tableau.com/views/MilwaukeePoliceDepartment-PartICrimes/MPDPublicCrimeDashboard?:embed=y&:showVizHome=no',
     { waitUntil: 'domcontentloaded', timeout: 60000 }
   );
 
