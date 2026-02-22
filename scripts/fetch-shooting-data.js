@@ -672,6 +672,7 @@ async function fetchOmaha() {
 }
 
 
+async function main() {
   const results = {};
   const fetchedAt = new Date().toISOString();
 
