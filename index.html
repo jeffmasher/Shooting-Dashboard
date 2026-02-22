@@ -186,6 +186,7 @@
         <option value="2022">2022</option>
       </select>
       <button class="btn btn-ghost" id="exportBtn" onclick="exportCSV()" disabled>↓ CSV</button>
+      <button class="btn btn-ghost" onclick="openSettings()" title="Settings">⚙ Settings</button>
       <button class="btn btn-accent" id="refreshBtn" onclick="fetchAll()">↻ Refresh All</button>
     </div>
   </header>
@@ -273,7 +274,20 @@
     </div>
   </div>
 
-  <!-- Debug box: shows Chicago field names and exact queries after fetch -->
+  <div class="manual-modal-overlay" id="settingsModal">
+    <div class="manual-modal">
+      <h3>⚙ SETTINGS</h3>
+      <div class="manual-field">
+        <label>Anthropic API Key <small style="color:var(--muted2)">(for Hampton, VA vision fetch)</small></label>
+        <input type="password" id="settingsApiKey" placeholder="sk-ant-api03-..." style="font-family:monospace;font-size:12px">
+      </div>
+      <div style="font-size:11px;color:var(--muted2);margin:-8px 0 12px">Stored locally in your browser. Used to read Hampton's gunshot image via Claude vision.</div>
+      <div class="manual-actions">
+        <button class="manual-save" onclick="saveSettings()">Save</button>
+        <button class="manual-cancel" onclick="closeSettings()">Cancel</button>
+      </div>
+    </div>
+  </div>
 
 
 </div>
@@ -972,19 +986,69 @@ var CITIES = [
     note: 'Gunshot Injuries (Vision AI)',
     type: 'Victims',
     dataUrl: 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=',
+    _cache: null,
+    _fetchVision: async function() {
+      if (this._cache) return this._cache;
+      // Check storage cache first (valid for 12 hours)
+      try {
+        var cached = await window.storage.get('hampton_vision_cache');
+        if (cached) {
+          var obj = JSON.parse(cached.value);
+          if (Date.now() - obj.fetchedAt < 12 * 3600 * 1000) { this._cache = obj; return obj; }
+        }
+      } catch(e) {}
+      // Get API key from storage
+      var keyStore = null;
+      try { keyStore = await window.storage.get('anthropic_api_key'); } catch(e) {}
+      if (!keyStore || !keyStore.value) return null;
+      var apiKey = keyStore.value.trim();
+      // Fetch the image via a CORS proxy
+      var imgUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
+      var proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(imgUrl);
+      var imgResp;
+      try { imgResp = await fetch(proxyUrl); } catch(e) { return null; }
+      if (!imgResp.ok) return null;
+      var blob = await imgResp.blob();
+      var base64 = await new Promise(res => {
+        var reader = new FileReader();
+        reader.onloadend = () => res(reader.result.split(',')[1]);
+        reader.readAsDataURL(blob);
+      });
+      // Call Claude vision
+      var apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 256,
+          messages: [{ role: 'user', content: [
+            { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: base64 } },
+            { type: 'text', text: 'This is a gunshot injury report table. Find the row "Total Persons with Gunshot Injuries". Return ONLY a JSON object with: ytd_current (YTD for most recent year), ytd_prior (YTD for prior year), end_date (end of reporting period as YYYY-MM-DD). No other text.' }
+          ]}]
+        })
+      });
+      if (!apiResp.ok) return null;
+      var data = await apiResp.json();
+      var text = data.content.map(c => c.text || '').join('').replace(/```json|```/g,'').trim();
+      var parsed = JSON.parse(text);
+      var result = { ytd: parsed.ytd_current, prior: parsed.ytd_prior, asof: parsed.end_date, fetchedAt: Date.now() };
+      try { await window.storage.set('hampton_vision_cache', JSON.stringify(result)); } catch(e) {}
+      this._cache = result;
+      return result;
+    },
     count: async function(s, e) {
-      var auto = await loadAutoData();
-      if (auto.hampton && auto.hampton.ok) {
+      var d = await this._fetchVision();
+      if (d) {
         var windowYear = parseInt(s.slice(0,4));
-        var asofYear = auto.hampton.asof ? parseInt(auto.hampton.asof.slice(0,4)) : CURRENT_YEAR;
-        return windowYear === asofYear ? auto.hampton.ytd : auto.hampton.prior;
+        var asofYear = d.asof ? parseInt(d.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? d.ytd : d.prior;
       }
       var key = 'manual_' + this.id + '_' + s.slice(0,4);
       try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
     },
     latest: async function() {
-      var auto = await loadAutoData();
-      if (auto.hampton && auto.hampton.ok && auto.hampton.asof) return auto.hampton.asof;
+      var d = await this._fetchVision();
+      if (d && d.asof) return d.asof;
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
   },
@@ -1100,7 +1164,33 @@ async function saveManual() {
 // Close modal on overlay click
 document.addEventListener('click', function(e) {
   if (e.target.id === 'manualModal') closeManual();
+  if (e.target.id === 'settingsModal') closeSettings();
 });
+
+async function openSettings() {
+  try {
+    var k = await window.storage.get('anthropic_api_key');
+    document.getElementById('settingsApiKey').value = k ? k.value : '';
+  } catch(e) { document.getElementById('settingsApiKey').value = ''; }
+  document.getElementById('settingsModal').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsModal').classList.remove('open');
+}
+
+async function saveSettings() {
+  var key = document.getElementById('settingsApiKey').value.trim();
+  try {
+    if (key) await window.storage.set('anthropic_api_key', key);
+    else await window.storage.delete('anthropic_api_key');
+  } catch(e) { console.warn('Storage error', e); }
+  // Clear Hampton cache so it re-fetches with new key
+  try { await window.storage.delete('hampton_vision_cache'); } catch(e) {}
+  var hampton = CITIES.find(c => c.id === 'hampton');
+  if (hampton) hampton._cache = null;
+  closeSettings();
+}
 
 async function fetchAll() {
   var year = parseInt(document.getElementById('yearSel').value);
