@@ -293,8 +293,9 @@ async function fetchWilmington() {
 async function fetchHampton() {
   // Try both URL variants
   const urls = [
-    'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-',
-    'https://www.hampton.gov/DocumentCenter/View/31010',
+    'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=',
+    'https://www.hampton.gov/DocumentCenter/Home/View/31010',
+    'https://www.hampton.gov/ArchiveCenter/ViewFile/Item/31010',
   ];
 
   let resp = null;
@@ -306,11 +307,12 @@ async function fetchHampton() {
       'Accept': 'application/pdf,*/*',
       'Accept-Encoding': 'gzip, deflate, br',
     });
-    const firstBytes = r.body.slice(0,5).toString('ascii');
-    console.log('Hampton HTTP status:', r.status, 'first bytes:', firstBytes, '(hex:', r.body.slice(0,5).toString('hex'), ')');
-    if (r.status === 200) { resp = r; usedUrl = url; break; }
+    const hex = r.body.slice(0,5).toString('hex');
+    const isPdf = r.body.slice(0,4).toString('ascii') === '%PDF';
+    console.log('Hampton HTTP status:', r.status, 'hex:', hex, 'isPDF:', isPdf);
+    if (r.status === 200 && isPdf) { resp = r; usedUrl = url; break; }
   }
-  if (!resp) throw new Error('Hampton PDF not accessible');
+  if (!resp) throw new Error('Hampton: no URL returned a valid PDF (all returned non-PDF content or failed)');
   console.log('Hampton PDF URL used:', usedUrl);
 
   const rows = await extractPdfRows(resp.body);
@@ -346,6 +348,71 @@ async function fetchHampton() {
 
   if (nums.length < 2) throw new Error(`Not enough numbers: ${nums.join(',')}`);
   return { ytd: nums[1], prior: nums[0], asof };
+}
+
+// ─── Hampton ──────────────────────────────────────────────────────────────────
+
+async function fetchHampton() {
+  const imgUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
+  console.log('Hampton image URL:', imgUrl);
+
+  const resp = await fetchUrl(imgUrl, 20000, {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'image/*,*/*',
+    'Accept-Encoding': 'gzip, deflate, br',
+  });
+  if (resp.status !== 200) throw new Error(`Hampton image HTTP ${resp.status}`);
+
+  const hex = resp.body.slice(0,4).toString('hex');
+  console.log('Hampton first bytes hex:', hex);
+
+  // Convert image buffer to base64 for Claude vision API
+  const base64 = resp.body.toString('base64');
+  const mediaType = hex.startsWith('ffd8') ? 'image/jpeg' : hex.startsWith('8950') ? 'image/png' : 'image/jpeg';
+
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
+
+  // Call Claude vision to extract the table data
+  const apiResp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'image',
+            source: { type: 'base64', media_type: mediaType, data: base64 }
+          },
+          {
+            type: 'text',
+            text: 'This is a gunshot injury report table. Find the row "Total Persons with Gunshot Injuries". Return ONLY a JSON object with these fields: ytd_current (YTD count for the most recent year), ytd_prior (YTD count for the prior year), end_date (the end date of the reporting period in YYYY-MM-DD format). No other text.'
+          }
+        ]
+      }]
+    })
+  });
+
+  if (!apiResp.ok) throw new Error(`Claude API HTTP ${apiResp.status}`);
+  const apiData = await apiResp.json();
+  const text = apiData.content.map(c => c.text || '').join('').trim();
+  console.log('Hampton Claude response:', text);
+
+  const clean = text.replace(/```json|```/g, '').trim();
+  const parsed = JSON.parse(clean);
+
+  return {
+    ytd: parsed.ytd_current,
+    prior: parsed.ytd_prior,
+    asof: parsed.end_date,
+  };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
