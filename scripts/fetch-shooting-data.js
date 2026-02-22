@@ -241,6 +241,15 @@ async function fetchMilwaukee() {
   }
   await page.waitForTimeout(3000);
 
+  // Click "Non-Fatal Shooting" filter to show that offense type's data
+  try {
+    await page.locator('text=Non-Fatal').first().click();
+    await page.waitForTimeout(2000);
+    console.log('Milwaukee: clicked Non-Fatal filter');
+  } catch(e) {
+    console.log('Milwaukee: could not click Non-Fatal filter:', e.message);
+  }
+
   // Extract the as-of date from "Data Current Through: M/D/YYYY"
   const fullText = await page.evaluate(() => document.body.innerText);
 
@@ -353,8 +362,8 @@ async function fetchMemphis() {
   const yr = new Date().getFullYear();
 
   // Chart title shows "2026: 69" and "2025: 92 (-25%)" - parse directly from title
-  const ytdMatch   = chartText.match(new RegExp(yr + ':\\s*(\\d+)'));
-  const priorMatch = chartText.match(new RegExp((yr - 1) + ':\\s*(\\d+)'));
+  const ytdMatch   = chartText.match(new RegExp(yr + ':\\s*(\\d{1,4})(?!\\d)'));
+  const priorMatch = chartText.match(new RegExp((yr - 1) + ':\\s*(\\d{1,4})(?!\\d)'));
 
   console.log('Memphis ytdMatch:', ytdMatch && ytdMatch[0], 'priorMatch:', priorMatch && priorMatch[0]);
 
