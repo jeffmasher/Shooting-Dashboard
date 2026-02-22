@@ -1,1 +1,12 @@
-{"detroit":{"ok":false,"error":"Not yet fetched"},"durham":{"ok":false,"error":"Not yet fetched"}}
+{
+  "detroit": {
+    "ok": false,
+    "error": "Cannot find module 'pdfjs-dist/legacy/build/pdf.js'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
+    "fetchedAt": "2026-02-22T01:03:13.384Z"
+  },
+  "durham": {
+    "ok": false,
+    "error": "Cannot find module 'pdfjs-dist/legacy/build/pdf.js'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
+    "fetchedAt": "2026-02-22T01:03:13.384Z"
+  }
+}
