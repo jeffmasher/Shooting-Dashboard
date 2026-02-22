@@ -11,7 +11,7 @@ const path  = require('path');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function fetchUrl(targetUrl, timeoutMs = 20000) {
+function fetchUrl(targetUrl, timeoutMs = 20000, extraHeaders = {}) {
   return new Promise((resolve, reject) => {
     const parsed = new URL(targetUrl);
     const lib = parsed.protocol === 'https:' ? https : http;
@@ -20,7 +20,7 @@ function fetchUrl(targetUrl, timeoutMs = 20000) {
       port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
       path: parsed.pathname + parsed.search,
       method: 'GET',
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ShootingDashboard/1.0)' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ShootingDashboard/1.0)', ...extraHeaders },
       timeout: timeoutMs,
     };
     const req = lib.request(options, (res) => {
@@ -227,13 +227,15 @@ async function fetchDurham() {
 async function fetchWilmington() {
   const pageUrl = 'https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports';
   console.log('Wilmington page URL:', pageUrl);
-  const pageResp = await fetchUrl(pageUrl);
+  const pageResp = await fetchUrl(pageUrl, 20000, {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Referer': 'https://www.wilmingtonde.gov/',
+  });
   if (pageResp.status !== 200) throw new Error(`Wilmington page HTTP ${pageResp.status}`);
 
   const html = pageResp.body.toString('utf8');
-
-  // Debug: show snippet of HTML to find PDF link pattern
-  console.log('Wilmington HTML snippet:', html.slice(0, 2000));
 
   // Find PDF link - look for showpublisheddocument links
   const pdfMatch = html.match(/href="(\/home\/showpublisheddocument\/[^"]+)"/i)
