@@ -289,6 +289,8 @@ async function socrataLatest(url, dateField, extraWhere) {
   return v ? v.slice(0, 10) : null;
 }
 
+
+
 function todayStr() {
   var n = new Date();
   var mm = String(n.getMonth() + 1).padStart(2, "0");
@@ -330,163 +332,256 @@ function getWindows(year) {
 var CITIES = [
   {
     id: 'chicago',
+    type: 'Victims',
     name: 'Chicago, IL',
     note: 'Shooting Victims (GUNSHOT_INJURY_I=YES)',
-    type: 'Victims',
-    async count(s, e) {
-      return odataCount(
-        'https://data.cityofchicago.org/api/odata/v4/gumc-mgzr',
-        `GUNSHOT_INJURY_I eq 'YES' and DATE ge ${s}T00:00:00Z and DATE le ${e}T23:59:59Z`
-      );
+    _url: 'https://data.cityofchicago.org/resource/gumc-mgzr.json',
+    count: async function(s, e) {
+      var where = "date >= '" + s + "T00:00:00.000' AND date <= '" + e + "T23:59:59.000' AND gunshot_injury_i = 'YES'";
+      var q = this._url + '?$where=' + encodeURIComponent(where) + '&$select=count(*)%20as%20n&$limit=1';
+      var r = await fetch(q, { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var d = await r.json();
+      return parseInt(d[0] && d[0].n ? d[0].n : 0);
     },
-    async latest() {
-      return odataLatest(
-        'https://data.cityofchicago.org/api/odata/v4/gumc-mgzr',
-        'DATE',
-        `GUNSHOT_INJURY_I eq 'YES'`
-      );
-    },
+    latest: async function() {
+      var q = this._url + '?$order=date%20DESC&$limit=1&$select=date&$where=' + encodeURIComponent("gunshot_injury_i = 'YES'");
+      try {
+        var r = await fetch(q, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return null;
+        var d = await r.json();
+        return d[0] && d[0].date ? d[0].date.slice(0, 10) : null;
+      } catch(e) { return null; }
+    }
   },
   {
     id: 'nyc',
-    name: 'New York City, NY',
-    note: 'Shooting Incidents (NYPD)',
     type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://data.cityofnewyork.us/resource/833y-fsy8.json',
-        `occur_date >= '${s}T00:00:00.000' AND occur_date <= '${e}T23:59:59.000'`
-      );
+    name: 'New York City, NY',
+    note: 'Shooting Victims (NYPD CompStat PDF)',
+    _pdfUrl: 'https://www.nyc.gov/assets/nypd/downloads/pdf/crime_statistics/cs-en-us-city.pdf',
+    _parsed: null,
+    _parse: async function() {
+      if (this._parsed) return this._parsed;
+      if (!window.pdfjsLib) {
+        await new Promise(function(resolve, reject) {
+          var s = document.createElement('script');
+          s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+          s.onload = resolve; s.onerror = reject;
+          document.head.appendChild(s);
+        });
+        window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+          'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      }
+      var resp = await fetch(this._pdfUrl, { signal: AbortSignal.timeout(20000) });
+      if (!resp.ok) throw new Error('PDF fetch HTTP ' + resp.status);
+      var buf = await resp.arrayBuffer();
+      var pdf = await window.pdfjsLib.getDocument({ data: buf }).promise;
+      var page = await pdf.getPage(1);
+      var tc = await page.getTextContent();
+      var tokens = tc.items.map(function(i) { return i.str.trim(); }).filter(function(s) { return s.length > 0; });
+      var text = tokens.join(' ');
+      var dateMatch = text.match(/(\d{1,2}\/\d{1,2}\/\d{4})\s+Through\s+(\d{1,2}\/\d{1,2}\/\d{4})/i);
+      if (!dateMatch) throw new Error('Could not find date range in PDF. Tokens: ' + tokens.slice(0,30).join('|'));
+      var asofRaw = dateMatch[2];
+      var aparts = asofRaw.split('/');
+      var asof = aparts[2] + '-' + aparts[0].padStart(2,'0') + '-' + aparts[1].padStart(2,'0');
+      var idx = tokens.findIndex(function(t) { return t.match(/shooting\s*vic/i); });
+      if (idx === -1) throw new Error('Could not find Shooting Vic row. Tokens: ' + tokens.slice(0,50).join('|'));
+      var nums = [];
+      for (var i = idx + 1; i < tokens.length && nums.length < 12; i++) {
+        if (tokens[i].match(/^-?[\d,]+\.?\d*$/)) nums.push(parseInt(tokens[i].replace(/,/g, '')));
+      }
+      if (nums.length < 9) throw new Error('Not enough numbers after Shooting Vic. Found: ' + nums.join(','));
+      var ytd   = nums[6];
+      var prior = nums[7];
+      this._parsed = { ytd: ytd, prior: prior, asof: asof };
+      return this._parsed;
     },
-    async latest() {
-      return socrataLatest('https://data.cityofnewyork.us/resource/833y-fsy8.json', 'occur_date');
+    count: async function(s, e) {
+      var p = await this._parse();
+      var windowYear = parseInt(s.slice(0, 4));
+      var asofYear   = parseInt(p.asof.slice(0, 4));
+      return windowYear === asofYear ? p.ytd : p.prior;
     },
+    latest: async function() {
+      var p = await this._parse();
+      return p.asof;
+    }
   },
   {
     id: 'philly',
-    name: 'Philadelphia, PA',
-    note: 'Shooting Victims',
     type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://phl.data.opendataphilly.org/resource/shooting_victims.json',
-        `date_ >= '${s}T00:00:00.000' AND date_ <= '${e}T23:59:59.000'`
-      );
+    name: 'Philadelphia, PA',
+    note: 'Shooting Victims (Carto SQL)',
+    count: async function(s, e) {
+      var sql = "SELECT COUNT(*) AS n FROM shootings WHERE date_ >= '" + s + "' AND date_ <= '" + e + "'";
+      var url = 'https://phl.carto.com/api/v2/sql?format=json&q=' + encodeURIComponent(sql);
+      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var d = await r.json();
+      return parseInt(d.rows[0].n);
     },
-    async latest() {
-      return socrataLatest('https://phl.data.opendataphilly.org/resource/shooting_victims.json', 'date_');
-    },
+    latest: async function() {
+      var sql = "SELECT date_ FROM shootings ORDER BY date_ DESC LIMIT 1";
+      var url = 'https://phl.carto.com/api/v2/sql?format=json&q=' + encodeURIComponent(sql);
+      try {
+        var r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return null;
+        var d = await r.json();
+        var v = d.rows && d.rows[0] ? d.rows[0].date_ : null;
+        return v ? v.slice(0, 10) : null;
+      } catch(e) { return null; }
+    }
   },
   {
     id: 'baltimore',
-    name: 'Baltimore, MD',
-    note: 'Shooting Incidents',
     type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://data.baltimorecity.gov/resource/wsfq-mvij.json',
-        `crimedate >= '${s}T00:00:00.000' AND crimedate <= '${e}T23:59:59.000' AND description = 'SHOOTING'`
-      );
+    name: 'Baltimore, MD',
+    note: 'Shooting Incidents (NIBRS, Shooting=Y)',
+    _url: 'https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/NIBRS_GroupA_Crime_Data/FeatureServer/0/query',
+    count: async function(s, e) {
+      var where = "Shooting = 'Y' AND CrimeDateTime >= DATE '" + s + "' AND CrimeDateTime <= DATE '" + e + "'";
+      var url = this._url + '?where=' + encodeURIComponent(where) + '&returnCountOnly=true&f=json';
+      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var d = await r.json();
+      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error).slice(0, 120));
+      return d.count;
     },
-    async latest() {
-      return socrataLatest(
-        'https://data.baltimorecity.gov/resource/wsfq-mvij.json',
-        'crimedate',
-        `description = 'SHOOTING'`
-      );
-    },
+    latest: async function() {
+      var where = "Shooting = 'Y'";
+      var url = this._url + '?where=' + encodeURIComponent(where) +
+        '&outFields=CrimeDateTime&orderByFields=CrimeDateTime+DESC&resultRecordCount=1&f=json';
+      try {
+        var r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return null;
+        var d = await r.json();
+        if (d.error || !d.features || !d.features.length) return null;
+        var raw = d.features[0].attributes.CrimeDateTime;
+        if (typeof raw === 'number') {
+          var dt = new Date(raw);
+          var mm = String(dt.getMonth() + 1).padStart(2, '0');
+          var dd = String(dt.getDate()).padStart(2, '0');
+          return dt.getFullYear() + '-' + mm + '-' + dd;
+        }
+        return raw ? raw.slice(0, 10) : null;
+      } catch(e) { return null; }
+    }
   },
   {
     id: 'nashville',
     name: 'Nashville, TN',
-    note: 'Shooting Incidents',
+    note: 'Gunshot Injuries (Manual)',
     type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://data.nashville.gov/resource/mn94-ufrd.json',
-        `incident_occurred >= '${s}T00:00:00.000' AND incident_occurred <= '${e}T23:59:59.000' AND offense_description = 'SHOOTING'`
-      );
+    manual: true,
+    dataUrl: 'https://www.nashville.gov/departments/police/data-dashboard/gunshot-injuries-map',
+    count: async function(s, e) {
+      var key = 'manual_' + this.id + '_' + s.slice(0,4);
+      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
     },
-    async latest() {
-      return socrataLatest(
-        'https://data.nashville.gov/resource/mn94-ufrd.json',
-        'incident_occurred',
-        `offense_description = 'SHOOTING'`
-      );
-    },
+    latest: async function() {
+      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+    }
   },
   {
     id: 'boston',
+    type: 'Victims',
     name: 'Boston, MA',
-    note: 'Shooting Incidents',
-    type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://data.boston.gov/resource/q9xk-edgp.json',
-        `shooting_date >= '${s}T00:00:00.000' AND shooting_date <= '${e}T23:59:59.000'`
-      );
+    note: 'Shooting Incidents (CSV)',
+    _csvUrl: 'https://data.boston.gov/datastore/dump/73c7e069-701f-4910-986d-b950f46c91a1?bom=True',
+    _cache: null,
+    _load: async function() {
+      if (this._cache) return this._cache;
+      var r = await fetch(this._csvUrl, { signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var text = await r.text();
+      var lines = text.trim().split('\n');
+      var headers = lines[0].split(',').map(function(h) { return h.trim().replace(/^"|"$/g, ''); });
+      var dateIdx = headers.findIndex(function(h) { return h.toUpperCase() === 'SHOOTING_DATE'; });
+      if (dateIdx === -1) throw new Error('SHOOTING_DATE column not found. Headers: ' + headers.join(', '));
+      var dates = [];
+      for (var i = 1; i < lines.length; i++) {
+        var cols = lines[i].split(',');
+        var val = cols[dateIdx] ? cols[dateIdx].trim().replace(/^"|"$/g, '') : '';
+        if (val) dates.push(val.slice(0, 10));
+      }
+      this._cache = dates;
+      return dates;
     },
-    async latest() {
-      return socrataLatest('https://data.boston.gov/resource/q9xk-edgp.json', 'shooting_date');
+    count: async function(s, e) {
+      var dates = await this._load();
+      return dates.filter(function(d) { return d >= s && d <= e; }).length;
     },
+    latest: async function() {
+      try {
+        var dates = await this._load();
+        if (!dates.length) return null;
+        return dates.slice().sort().pop();
+      } catch(e) { return null; }
+    }
   },
-  {
-    id: 'dallas',
-    name: 'Dallas, TX',
-    note: 'Shooting Incidents',
-    type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://www.dallasopendata.com/resource/qv6i-rri7.json',
-        `date1 >= '${s}T00:00:00.000' AND date1 <= '${e}T23:59:59.000' AND typeofincident = 'Shooting'`
-      );
-    },
-    async latest() {
-      return socrataLatest(
-        'https://www.dallasopendata.com/resource/qv6i-rri7.json',
-        'date1',
-        `typeofincident = 'Shooting'`
-      );
-    },
-  },
+
   {
     id: 'louisville',
-    name: 'Louisville, KY',
-    note: 'Shooting Incidents (NIBRS 13A)',
     type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://data.louisvilleky.gov/resource/wa5d-dktg.json',
-        `date_reported >= '${s}T00:00:00.000' AND date_reported <= '${e}T23:59:59.000' AND nibrs_code = '13A'`
-      );
+    name: 'Louisville, KY',
+    note: 'Gun Violence Victims (Non-Fatal + Homicide)',
+    _url: 'https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/Gun_Violence_Data/FeatureServer/0/query',
+    count: async function(s, e) {
+      var where = "(Crime_Type = 'Non-Fatal Shooting' OR Crime_Type = 'Homicide')" +
+        " AND DateTime >= '" + s + " 00:00:00' AND DateTime <= '" + e + " 23:59:59'";
+      var url = this._url + '?where=' + encodeURIComponent(where) + '&returnCountOnly=true&f=json';
+      var r = await fetch(url, { signal: AbortSignal.timeout(15000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var d = await r.json();
+      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error).slice(0, 120));
+      return d.count;
     },
-    async latest() {
-      return socrataLatest(
-        'https://data.louisvilleky.gov/resource/wa5d-dktg.json',
-        'date_reported',
-        `nibrs_code = '13A'`
-      );
-    },
+    latest: async function() {
+      var where = "Crime_Type = 'Non-Fatal Shooting' OR Crime_Type = 'Homicide'";
+      var url = this._url + '?where=' + encodeURIComponent(where) +
+        '&outFields=DateTime&orderByFields=DateTime+DESC&resultRecordCount=1&f=json';
+      try {
+        var r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+        if (!r.ok) return null;
+        var d = await r.json();
+        if (d.error || !d.features || !d.features.length) return null;
+        var raw = d.features[0].attributes.DateTime;
+        if (typeof raw === 'number') {
+          var dt = new Date(raw);
+          var mm = String(dt.getMonth() + 1).padStart(2, '0');
+          var dd = String(dt.getDate()).padStart(2, '0');
+          return dt.getFullYear() + '-' + mm + '-' + dd;
+        }
+        return raw ? raw.slice(0, 10) : null;
+      } catch(e) { return null; }
+    }
   },
   {
     id: 'seattle',
     name: 'Seattle, WA',
-    note: 'Shooting Incidents',
+    note: 'Shooting Victims (Manual)',
     type: 'Victims',
-    async count(s, e) {
-      return socrataCount(
-        'https://data.seattle.gov/resource/tazs-3rd5.json',
-        `report_datetime >= '${s}T00:00:00.000' AND report_datetime <= '${e}T23:59:59.000' AND offense = 'Weapon – Shooting'`
-      );
+    manual: true,
+    dataUrl: 'https://www.seattle.gov/police/information-and-data/data/crime-dashboard',
+    count: async function(s, e) {
+      var key = 'manual_' + this.id + '_' + s.slice(0,4);
+      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
     },
-    async latest() {
-      return socrataLatest(
-        'https://data.seattle.gov/resource/tazs-3rd5.json',
-        'report_datetime',
-        `offense = 'Weapon – Shooting'`
-      );
-    },
+    latest: async function() {
+      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+    }
   },
+
+
+
+
+
+
+
+
+
 {
     id: 'cincinnati',
     type: 'Victims',
@@ -1295,9 +1390,10 @@ function exportJPEG() {
 
   // ── Column headers ────────────────────────────────────────────────────────
   var colCity  = 24;
-  var colYTD   = W - 240;
-  var colPrior = W - 150;
-  var colChg   = W - 50;
+  var colYTD   = W - 330;
+  var colPrior = W - 240;
+  var colChg   = W - 140;
+  var colAsOf  = W - 24;
 
   ctx.fillStyle = FT_LIGHT;
   ctx.font = 'bold 10px Arial, sans-serif';
@@ -1305,6 +1401,7 @@ function exportJPEG() {
   ctx.textAlign = 'right'; ctx.fillText(year + ' YTD', colYTD, 112);
   ctx.textAlign = 'right'; ctx.fillText((year-1) + ' YTD', colPrior, 112);
   ctx.textAlign = 'right'; ctx.fillText('CHANGE', colChg, 112);
+  ctx.textAlign = 'right'; ctx.fillText('AS OF', colAsOf, 112);
 
   // ── Data rows ─────────────────────────────────────────────────────────────
   rows.forEach(function(row, i) {
@@ -1343,6 +1440,12 @@ function exportJPEG() {
       ctx.fillStyle = FT_LIGHT;
       ctx.fillText('—', colChg, y);
     }
+
+    // As Of
+    ctx.fillStyle = FT_LIGHT;
+    ctx.font = '11px Arial, sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText(row.asof || '—', colAsOf, y);
 
     // Row separator
     ctx.strokeStyle = FT_BORDER;
