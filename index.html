@@ -678,7 +678,7 @@ var CITIES = [
   {
     id: 'detroit',
     name: 'Detroit, MI',
-    note: 'Non-Fatal Shootings (Manual)',
+    note: 'Non-Fatal Shootings',
     type: 'Non-Fatal',
     dataUrl: 'https://detroitmi.gov/Calendar-and-Events?field_start_value=2026-02-19&title=&term_node_tid_depth=All&term_node_tid_depth_1=1676&term_node_tid_depth_2=All',
     count: async function(s, e) {
@@ -963,16 +963,22 @@ var CITIES = [
   {
     id: 'hampton',
     name: 'Hampton, VA',
-    note: 'Gunshot Injuries (Manual)',
+    note: 'Gunshot Injuries (Non-Fatal)',
     type: 'Victims',
-    manual: true,
     dataUrl: 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=',
     count: async function(s, e) {
-      var key = 'manual_' + this.id + '_' + s.slice(0,4);
-      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
+      var auto = await loadAutoData();
+      if (auto.hampton && auto.hampton.ok) {
+        var windowYear = parseInt(s.slice(0,4));
+        var asofYear = auto.hampton.asof ? parseInt(auto.hampton.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.hampton.ytd : auto.hampton.prior;
+      }
+      return null;
     },
     latest: async function() {
-      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+      var auto = await loadAutoData();
+      if (auto.hampton && auto.hampton.ok && auto.hampton.asof) return auto.hampton.asof;
+      return null;
     }
   },
   {
