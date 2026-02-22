@@ -290,7 +290,7 @@ async function fetchMilwaukee() {
 
   await browser.close();
 
-  if (ytd === null) throw new Error('Could not find Non-Fatal Shooting YTD values.\nPage text sample: ' + lines.slice(0,40).join(' | '));
+  if (ytd === null) throw new Error('Could not find Non-Fatal Shooting YTD values.\nFull text: ' + lines.join(' | '));
 
   return { ytd, prior, asof };
 }
@@ -353,8 +353,8 @@ async function fetchMemphis() {
   const yr = new Date().getFullYear();
 
   // Chart title shows "2026: 69" and "2025: 92 (-25%)" - parse directly from title
-  const ytdMatch   = chartText.match(new RegExp(yr + ':\s*(\d+)'));
-  const priorMatch = chartText.match(new RegExp((yr - 1) + ':\s*(\d+)'));
+  const ytdMatch   = chartText.match(new RegExp(yr + ':\\s*(\\d+)'));
+  const priorMatch = chartText.match(new RegExp((yr - 1) + ':\\s*(\\d+)'));
 
   console.log('Memphis ytdMatch:', ytdMatch && ytdMatch[0], 'priorMatch:', priorMatch && priorMatch[0]);
 
