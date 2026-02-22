@@ -129,10 +129,11 @@ async function fetchDetroit() {
   const rows = await extractPdfRows(resp.body);
   console.log('Detroit rows:', rows.slice(0, 20));
 
-  // Find date row: "Thursday,February19,2026" or "Thursday, February 19, 2026"
+  // Find date row: "Thursday,February19,2026" (letters and digits joined, no spaces)
   let asof = null;
   for (const row of rows) {
-    const dateMatch = row.match(/\w+day,?\s*(\w+)\s*(\d{1,2}),?\s*(\d{4})/i);
+    // Match: weekday + month-name + digits + year (all possibly without spaces)
+    const dateMatch = row.match(/(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\w*,?\s*(January|February|March|April|May|June|July|August|September|October|November|December)\s*(\d{1,2}),?\s*(\d{4})/i);
     if (dateMatch) {
       const months = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
       const mo = months[dateMatch[1].toLowerCase()];
@@ -142,6 +143,14 @@ async function fetchDetroit() {
       }
     }
   }
+  // Fallback: look for M/D/YYYY pattern in any row
+  if (!asof) {
+    for (const row of rows) {
+      const m = row.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (m) { asof = `${m[3]}-${m[1].padStart(2,'0')}-${m[2].padStart(2,'0')}`; break; }
+    }
+  }
+  console.log('Detroit asof:', asof);
 
   // Find Non-Fatal Shooting row (words may be joined without space)
   const nfsRow = rows.find(r => r.match(/Non-?Fatal\s*Shooting/i));
@@ -223,9 +232,14 @@ async function fetchWilmington() {
 
   const html = pageResp.body.toString('utf8');
 
+  // Debug: show snippet of HTML to find PDF link pattern
+  console.log('Wilmington HTML snippet:', html.slice(0, 2000));
+
   // Find PDF link - look for showpublisheddocument links
-  const pdfMatch = html.match(/href="(\/home\/showpublisheddocument\/[^"]+)"/i);
-  if (!pdfMatch) throw new Error('No PDF link found on Wilmington page. HTML snippet: ' + html.slice(0, 500));
+  const pdfMatch = html.match(/href="(\/home\/showpublisheddocument\/[^"]+)"/i)
+    || html.match(/href="(https?:\/\/[^"]*showpublisheddocument[^"]+)"/i)
+    || html.match(/(https?:\/\/[^"'\s]*\.pdf[^"'\s]*)/i);
+  if (!pdfMatch) throw new Error('No PDF link found on Wilmington page. HTML length: ' + html.length + ' snippet: ' + html.slice(0, 800));
 
   const pdfUrl = 'https://www.wilmingtonde.gov' + pdfMatch[1];
   console.log('Wilmington PDF URL:', pdfUrl);
