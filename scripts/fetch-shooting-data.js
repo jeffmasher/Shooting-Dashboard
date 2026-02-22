@@ -530,9 +530,13 @@ async function fetchPittsburgh() {
     console.log('Pittsburgh: Gun coordinate click failed:', e.message.split('\n')[0]);
   }
 
-  // Parse values directly from page text - no vision needed
-  // The accessible text contains the table data in order
+  // Parse values directly from page text after Gun filter click
   const pageText = await page.evaluate(() => document.body.innerText);
+  await browser.close();
+
+  // Log a snippet to see if Gun filter changed the values
+  const homSnippet = pageText.match(/Number of Homicides[\s\S]{0,200}/);
+  console.log('Pittsburgh post-click homicide snippet:', homSnippet ? homSnippet[0].substring(0, 150) : 'NOT FOUND');
   await browser.close();
 
   const yr = new Date().getFullYear();
