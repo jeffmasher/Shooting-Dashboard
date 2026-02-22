@@ -291,68 +291,6 @@ async function fetchWilmington() {
 // ─── Hampton ──────────────────────────────────────────────────────────────────
 
 async function fetchHampton() {
-  // Try both URL variants
-  const urls = [
-    'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=',
-    'https://www.hampton.gov/DocumentCenter/Home/View/31010',
-    'https://www.hampton.gov/ArchiveCenter/ViewFile/Item/31010',
-  ];
-
-  let resp = null;
-  let usedUrl = null;
-  for (const url of urls) {
-    console.log('Hampton trying URL:', url);
-    const r = await fetchUrl(url, 20000, {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-      'Accept': 'application/pdf,*/*',
-      'Accept-Encoding': 'gzip, deflate, br',
-    });
-    const hex = r.body.slice(0,5).toString('hex');
-    const isPdf = r.body.slice(0,4).toString('ascii') === '%PDF';
-    console.log('Hampton HTTP status:', r.status, 'hex:', hex, 'isPDF:', isPdf);
-    if (r.status === 200 && isPdf) { resp = r; usedUrl = url; break; }
-  }
-  if (!resp) throw new Error('Hampton: no URL returned a valid PDF (all returned non-PDF content or failed)');
-  console.log('Hampton PDF URL used:', usedUrl);
-
-  const rows = await extractPdfRows(resp.body);
-  console.log('Hampton rows:', rows.slice(0, 20));
-
-  // Date: "Jan. 1- 31, 2025 vs. Jan. 1- 31, 2026" or similar
-  let asof = null;
-  for (const row of rows) {
-    // Look for the later year's end date
-    const m = row.match(/vs\.\s*\w+[\.\s]+\d+[\s\-]+(\d+),?\s*(\d{4})/i);
-    if (m) {
-      // Find month from the "vs." part
-      const monthMatch = row.match(/vs\.\s*(\w+)/i);
-      const months = {jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
-      const mo = monthMatch ? months[monthMatch[1].slice(0,3).toLowerCase()] : null;
-      if (mo) {
-        asof = `${m[2]}-${String(mo).padStart(2,'0')}-${String(parseInt(m[1])).padStart(2,'0')}`;
-        break;
-      }
-    }
-  }
-
-  // Find "Total Persons with Gunshot Injuries" row
-  const totalRow = rows.find(r => r.match(/Total\s+Persons\s+with\s+Gunshot/i));
-  if (!totalRow) throw new Error('Total row not found. Rows: ' + rows.join(' | '));
-  console.log('Hampton total row:', totalRow);
-
-  // Columns: label | YTD prior | YTD current | diff | %diff
-  const nums = [...totalRow.matchAll(/-?[\d,]+/g)]
-    .map(m => parseInt(m[0].replace(/,/g,'')))
-    .filter(n => !isNaN(n));
-  console.log('Hampton nums:', nums);
-
-  if (nums.length < 2) throw new Error(`Not enough numbers: ${nums.join(',')}`);
-  return { ytd: nums[1], prior: nums[0], asof };
-}
-
-// ─── Hampton ──────────────────────────────────────────────────────────────────
-
-async function fetchHampton() {
   const imgUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
   console.log('Hampton image URL:', imgUrl);
 
@@ -370,8 +308,8 @@ async function fetchHampton() {
   const base64 = resp.body.toString('base64');
   const mediaType = hex.startsWith('ffd8') ? 'image/jpeg' : hex.startsWith('8950') ? 'image/png' : 'image/jpeg';
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  console.log('Hampton API key present:', !!apiKey, 'length:', apiKey ? apiKey.length : 0);
+  const apiKey = (process.env.ANTHROPIC_API_KEY || '').trim();
+  console.log('Hampton API key present:', !!apiKey, 'length:', apiKey.length, 'raw length:', (process.env.ANTHROPIC_API_KEY || '').length);
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
 
   // Call Claude vision to extract the table data
