@@ -3,7 +3,7 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T02:48:08.844Z",
+    "fetchedAt": "2026-02-22T02:53:40.479Z",
     "ok": true
   },
   "durham": {
@@ -11,12 +11,12 @@
     "prior": 21,
     "asof": "2026-02-14",
     "adid": 7554,
-    "fetchedAt": "2026-02-22T02:48:08.844Z",
+    "fetchedAt": "2026-02-22T02:53:40.479Z",
     "ok": true
   },
   "hampton": {
     "ok": false,
     "error": "ANTHROPIC_API_KEY not set",
-    "fetchedAt": "2026-02-22T02:48:08.844Z"
+    "fetchedAt": "2026-02-22T02:53:40.479Z"
   }
 }
