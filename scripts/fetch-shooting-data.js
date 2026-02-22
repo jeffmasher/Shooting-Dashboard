@@ -462,6 +462,124 @@ async function fetchHampton() {
 }
 
 
+// ─── Pittsburgh (Power BI Gov) ───────────────────────────────────────────────
+
+async function fetchPittsburgh() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  page.setDefaultTimeout(30000);
+
+  const url = 'https://app.powerbigov.us/view?r=eyJrIjoiMDYzNWMyNGItNWNjMS00ODMwLWIxZDgtMTNkNzhlZDE2OWFjIiwidCI6ImY1ZjQ3OTE3LWM5MDQtNDM2OC05MTIwLWQzMjdjZjE3NTU5MSJ9';
+  console.log('Pittsburgh: loading Power BI dashboard...');
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+  // Wait for report to load
+  try {
+    await page.waitForFunction(
+      () => document.body.innerText.includes('Non-Fatal'),
+      { timeout: 30000 }
+    );
+  } catch(e) {
+    console.log('Pittsburgh: timed out waiting for Non-Fatal, proceeding...');
+  }
+  await page.waitForTimeout(4000);
+
+  // Get as-of date from page 1 header "Last Updated: M/DD/YYYY"
+  const page1Text = await page.evaluate(() => document.body.innerText);
+  const dateMatch = page1Text.match(/Last Updated[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  let asof = null;
+  if (dateMatch) {
+    asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
+  }
+  console.log('Pittsburgh asof:', asof);
+
+  // Navigate to page 2 - look for "Annual Stats" or page 2 button
+  console.log('Pittsburgh: navigating to page 2...');
+  try {
+    // Try clicking the page 2 navigation button
+    await page.locator('[aria-label="Page 2"]').first().click();
+    await page.waitForTimeout(3000);
+  } catch(e) {
+    // Try clicking "Annual Stats" tab
+    try {
+      await page.locator('text=Annual Stats').first().click();
+      await page.waitForTimeout(3000);
+      console.log('Pittsburgh: clicked Annual Stats tab');
+    } catch(e2) {
+      console.log('Pittsburgh: could not navigate to page 2:', e2.message);
+    }
+  }
+
+  // Click "Gun" in the Weapon Type by Incident chart to filter
+  console.log('Pittsburgh: clicking Gun filter...');
+  try {
+    await page.locator('text=Gun').first().click();
+    await page.waitForTimeout(3000);
+    console.log('Pittsburgh: clicked Gun filter');
+  } catch(e) {
+    console.log('Pittsburgh: could not click Gun:', e.message);
+  }
+
+  // Screenshot and send to Claude vision to extract the numbers
+  const screenshotBuf = await page.screenshot({ fullPage: false });
+  await browser.close();
+  console.log('Pittsburgh: screenshot size:', screenshotBuf.length, 'bytes');
+
+  const base64Image = screenshotBuf.toString('base64');
+  const yr = new Date().getFullYear();
+
+  const claudeData = await new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
+          { type: 'text', text: `This is the Pittsburgh Violent Crimes Dashboard filtered to Gun weapon type. Find the YTD tables showing "Number of Homicides" and "Number of Non-Fatal Shootings" for ${yr} and ${yr-1}. Add them together to get total shooting victims. Reply with ONLY: YTD${yr}=N YTD${yr-1}=N (where N is homicides + non-fatal shootings combined for that year)` }
+        ]
+      }]
+    });
+    const req = require('https').request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch(e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  const responseText = claudeData.content?.[0]?.text || '';
+  console.log('Pittsburgh vision response:', responseText);
+
+  const ytdMatch   = responseText.match(new RegExp('YTD' + yr + '=(\\d+)'));
+  const priorMatch = responseText.match(new RegExp('YTD' + (yr-1) + '=(\\d+)'));
+
+  if (!ytdMatch) throw new Error('Could not parse Pittsburgh values. Response: ' + responseText);
+
+  return {
+    ytd:   parseInt(ytdMatch[1]),
+    prior: priorMatch ? parseInt(priorMatch[1]) : null,
+    asof
+  };
+}
+
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -516,6 +634,16 @@ async function main() {
   } catch (e) {
     console.error('Hampton error:', e.message);
     results.hampton = { ok: false, error: e.message, fetchedAt };
+  }
+
+  // Pittsburgh
+  try {
+    console.log('\n--- Fetching Pittsburgh ---');
+    results.pittsburgh = { ...(await fetchPittsburgh()), fetchedAt, ok: true };
+    console.log('Pittsburgh:', results.pittsburgh);
+  } catch (e) {
+    console.error('Pittsburgh error:', e.message);
+    results.pittsburgh = { ok: false, error: e.message, fetchedAt };
   }
 
   // Write output
