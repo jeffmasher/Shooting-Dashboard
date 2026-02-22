@@ -1182,16 +1182,23 @@ function render() {
     return (va - vb) * sortDir;
   });
 
-  var firstManualSeen = false;
+  // Check if any manual cities have no data at all
+  var anyManualEmpty = rows.some(function(row) {
+    return row.city.manual && row.s.status === 'ok' && row.s.ytd == null && row.s.prior == null;
+  });
+
+  var firstEmptyManualSeen = false;
   tbody.innerHTML = rows.map(function(row) {
     var city = row.city;
     var s = row.s;
     var chgVal = row.chgVal;
 
-    // Insert divider before first manual city when in default order
+    // Insert divider before first manual city with no data entered, only in default sort order
     var divider = '';
-    if (city.manual && !firstManualSeen && sortField === 'ytd' && sortDir === -1) {
-      firstManualSeen = true;
+    if (anyManualEmpty && city.manual && !firstEmptyManualSeen &&
+        s.status === 'ok' && s.ytd == null && s.prior == null &&
+        sortField === 'ytd' && sortDir === -1) {
+      firstEmptyManualSeen = true;
       divider = '<tr class="divider-row"><td colspan="6"><span>── MANUAL ENTRY ──────────────────────────</span></td></tr>';
     }
 
