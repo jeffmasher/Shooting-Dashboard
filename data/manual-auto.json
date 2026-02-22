@@ -3,40 +3,42 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T23:05:11.655Z",
+    "fetchedAt": "2026-02-22T23:12:54.927Z",
     "ok": true
   },
   "durham": {
     "ytd": 12,
     "prior": 18,
     "asof": "2026-02-14",
-    "fetchedAt": "2026-02-22T23:05:11.655Z",
+    "fetchedAt": "2026-02-22T23:12:54.927Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 39,
     "prior": 54,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-22T23:05:11.655Z",
+    "fetchedAt": "2026-02-22T23:12:54.927Z",
     "ok": true
   },
   "memphis": {
     "ytd": 69,
     "prior": 92,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-22T23:05:11.655Z",
+    "fetchedAt": "2026-02-22T23:12:54.927Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
-    "asof": "2026-01-31",
-    "fetchedAt": "2026-02-22T23:05:11.655Z",
+    "asof": "2025-01-31",
+    "fetchedAt": "2026-02-22T23:12:54.927Z",
     "ok": true
   },
   "pittsburgh": {
-    "ok": false,
-    "error": "Could not parse Pittsburgh values. Response: I can see this is the Pittsburgh Bureau of Police Violent Crimes Dashboard, but I'm unable to access the actual data tables showing the specific numbers for \"Number of Homicides\" and \"Number of Non-Fatal Shootings\" for 2026 and 2025. The image shows the dashboard interface and menu options, but not the underlying data.\n\nTo provide you with the accurate calculation you're requesting, I would need to see the actual YTD tables with those specific crime statistics displayed.",
-    "fetchedAt": "2026-02-22T23:05:11.655Z"
+    "ytd": 10,
+    "prior": 12,
+    "asof": "2026-02-22",
+    "fetchedAt": "2026-02-22T23:12:54.927Z",
+    "ok": true
   }
 }
