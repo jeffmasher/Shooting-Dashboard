@@ -130,6 +130,7 @@ async function fetchDetroit() {
 // ─── Durham ───────────────────────────────────────────────────────────────────
 
 async function fetchDurham() {
+  // Durham PDF is an image-based bar chart - use Claude vision API to extract numbers
   const archiveUrl = 'https://www.durhamnc.gov/Archive.aspx?AMID=211';
   console.log('Durham archive URL:', archiveUrl);
   const archResp = await fetchUrl(archiveUrl);
@@ -145,74 +146,86 @@ async function fetchDurham() {
   const pdfResp = await fetchUrl(pdfUrl);
   if (pdfResp.status !== 200) throw new Error(`Durham PDF HTTP ${pdfResp.status}`);
 
-  // Try page 1 for the date, then scan all pages for the data table
-  let pdfjsLib;
-  try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
-  catch(e) { pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
+  // Get as-of date from PDF text layer (title text is accessible even if chart is image)
+  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
   pdfjsLib.GlobalWorkerOptions.workerSrc = false;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfResp.body) }).promise;
-  const numPages = pdf.numPages;
-  console.log('Durham PDF pages:', numPages);
-
-  // Collect tokens from all pages
-  let allTokens = [];
-  for (let p = 1; p <= numPages; p++) {
-    const pg = await pdf.getPage(p);
-    const tc = await pg.getTextContent();
-    const raw = tc.items.map(i => i.str).filter(s => s.length > 0);
-    const merged = [];
-    let run = '';
-    for (const tok of raw) {
-      if (tok.length === 1 && tok.trim().length > 0) { run += tok; }
-      else { if (run.length > 0) { merged.push(run.trim()); run = ''; } const t = tok.trim(); if (t.length > 0) merged.push(t); }
-    }
-    if (run.length > 0) merged.push(run.trim());
-    const pageTokens = [];
-    for (const t of merged) { pageTokens.push(...t.split(/\s+/).filter(x => x.length > 0)); }
-    allTokens = allTokens.concat(pageTokens);
-  }
-  const tokens = allTokens;
-  const text = tokens.join(' ');
-
+  const pg = await pdf.getPage(1);
+  const tc = await pg.getTextContent();
+  const text = tc.items.map(i => i.str).join(' ');
   const dateMatch = text.match(/through\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
-  if (!dateMatch) throw new Error('Date not found. Tokens: ' + tokens.slice(0,30).join('|'));
-  const months = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
-  const mo = months[dateMatch[1].toLowerCase()];
-  const asof = `${dateMatch[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dateMatch[2])).padStart(2,'0')}`;
+  let asof = null;
+  if (dateMatch) {
+    const months = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+    const mo = months[dateMatch[1].toLowerCase()];
+    if (mo) asof = `${dateMatch[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dateMatch[2])).padStart(2,'0')}`;
+  }
 
-  const fatalIdx    = tokens.findIndex(t => t.match(/^Fatal$/i));
-  const nonfatalIdx = tokens.findIndex((t,i) => t.match(/^Non.?Fatal$/i) && i > fatalIdx);
+  // Render first page to PNG using Playwright, then send to Claude vision API
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto(pdfUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForTimeout(2000);
+  const screenshotBuf = await page.screenshot({ fullPage: true });
+  await browser.close();
 
-  // Grab exactly 3 YTD numbers after a label - only accept values < 2000
-  // (YTD shooting counts won't be >2000; all-time totals would be much higher)
-  function grab3(startIdx) {
-    const nums = [];
-    for (let i = startIdx+1; i < tokens.length && nums.length < 3; i++) {
-      if (/^\d+$/.test(tokens[i])) {
-        const n = parseInt(tokens[i]);
-        if (n < 2000) nums.push(n);
+  const base64Image = screenshotBuf.toString('base64');
+  console.log('Durham: screenshot taken, size:', screenshotBuf.length, 'bytes');
+
+  // Call Claude API to extract chart values
+  const claudeResp = await fetchUrl('https://api.anthropic.com/v1/messages');
+  // Use https.request directly for POST with body
+  const claudeData = await new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
+          { type: 'text', text: 'This is a Durham Police Department shooting data chart. Look at the "Non-Fatal" bar group on the right side. What are the exact numbers shown above the three bars for 2024, 2025, and 2026? Reply with ONLY: 2024=N 2025=N 2026=N' }
+        ]
+      }]
+    });
+    const req = require('https').request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
       }
-      // Stop if we hit the next section label
-      if (nums.length === 0 && tokens[i].match(/^(Fatal|Non|Shooting|Total|Year)/i) && i > startIdx+2) break;
-    }
-    return nums;
-  }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch(e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
 
-  const fatal3    = fatalIdx    !== -1 ? grab3(fatalIdx)    : [];
-  const nonfatal3 = nonfatalIdx !== -1 ? grab3(nonfatalIdx) : [];
+  console.log('Durham Claude response:', JSON.stringify(claudeData).substring(0, 300));
+  const responseText = claudeData.content?.[0]?.text || '';
+  console.log('Durham vision response:', responseText);
 
-  console.log('Durham fatal3:', fatal3, 'nonfatal3:', nonfatal3);
+  const m2024 = responseText.match(/2024=(\d+)/);
+  const m2025 = responseText.match(/2025=(\d+)/);
+  const m2026 = responseText.match(/2026=(\d+)/);
 
-  let ytd, prior;
-  if (fatal3.length >= 2 && nonfatal3.length >= 2) {
-    // Columns are [2024_ytd, 2025_ytd, 2026_ytd] - take last two available
-    ytd   = fatal3[fatal3.length-1]    + nonfatal3[nonfatal3.length-1];
-    prior = fatal3[fatal3.length-2]    + nonfatal3[nonfatal3.length-2];
-  } else {
-    throw new Error('Could not parse Durham fatal/nonfatal nums. fatal3=' + fatal3.join(',') + ' nonfatal3=' + nonfatal3.join(',') + ' tokens=' + tokens.slice(0,50).join('|'));
-  }
+  if (!m2026) throw new Error('Could not parse Durham chart values from vision API. Response: ' + responseText);
 
-  return { ytd, prior, asof, adid: latestAdid };
+  return {
+    ytd:   parseInt(m2026[1]),
+    prior: m2025 ? parseInt(m2025[1]) : null,
+    asof
+  };
 }
 
 // ─── Milwaukee (Tableau) ──────────────────────────────────────────────────────
@@ -241,65 +254,51 @@ async function fetchMilwaukee() {
   }
   await page.waitForTimeout(3000);
 
-  // Click "Non-Fatal Shooting" filter to show that offense type's data
-  try {
-    await page.locator('text=Non-Fatal').first().click();
-    await page.waitForTimeout(2000);
-    console.log('Milwaukee: clicked Non-Fatal filter');
-  } catch(e) {
-    console.log('Milwaukee: could not click Non-Fatal filter:', e.message);
-  }
-
-  // Extract the as-of date from "Data Current Through: M/D/YYYY"
+  // Get date from top-level page text
   const fullText = await page.evaluate(() => document.body.innerText);
-
   const dateMatch = fullText.match(/Data Current Through[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   let asof = null;
   if (dateMatch) {
     asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
   }
 
-  // Milwaukee table layout (from page text):
-  // Headers: "2024 | 2025 | %CHANGE | 2024-25 | YTD 2024 | YTD 2025 | YTD 2026 | %CHANGE YTD 2024-26 | %CHANGE"
-  // Then rows: "Non-Fatal Shooting" followed by its numbers, then "Carjacking" row
-  // Strategy: find "Non-Fatal" then "Shooting", collect numbers until next offense type
-  const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
+  // Table row data lives inside Tableau iframes - search all frames
   let ytd = null, prior = null;
+  const allFrames = page.frames();
+  console.log('Milwaukee: frame count:', allFrames.length);
 
-  // Find index of "Non-Fatal" line (the row label)
-  let nfIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i] === 'Non-Fatal' && lines[i+1] === 'Shooting') { nfIdx = i; break; }
-    if (lines[i].match(/^Non-Fatal\s+Shooting$/i)) { nfIdx = i; break; }
-  }
+  for (const frame of allFrames) {
+    try {
+      const frameText = await frame.evaluate(() => document.body?.innerText || '');
+      if (!frameText.includes('Non-Fatal') || frameText.length < 200) continue;
+      console.log('Milwaukee: checking frame, length:', frameText.length, 'sample:', frameText.substring(0,100));
 
-  if (nfIdx !== -1) {
-    const startIdx = (lines[nfIdx] === 'Non-Fatal') ? nfIdx + 2 : nfIdx + 1;
-    const nums = [];
-    for (let j = startIdx; j < Math.min(startIdx + 20, lines.length) && nums.length < 9; j++) {
-      if (/^-?[\d,]+$/.test(lines[j])) nums.push(parseInt(lines[j].replace(/,/g, '')));
-      else if (/^-?\d+\.?\d*%$/.test(lines[j])) continue; // skip % values
-      else if (lines[j].match(/^(Carjacking|Homicide|Robbery|Assault)/i)) break;
-    }
-    console.log('Milwaukee nums:', nums);
-    // Columns: full2024, full2025, ytd2024, ytd2025, ytd2026 (may have %change cols too)
-    // Filter out likely %change values (small numbers -100 to 100) vs counts
-    const counts = nums.filter((n, i) => {
-      // The first 2 are full-year counts (larger), next are YTD counts
-      return true; // take all, pick by position
-    });
-    if (counts.length >= 5) {
-      // Expected: [full2024, full2025, ytd2024, ytd2025, ytd2026, ...]
-      prior = counts[counts.length - 2]; // YTD 2025
-      ytd   = counts[counts.length - 1]; // YTD 2026
-      // But only if last value looks like a shooting count (< 500)
-      if (ytd > 500) { prior = counts[3]; ytd = counts[4]; }
-    }
+      const lines = frameText.split('\n').map(l => l.trim()).filter(Boolean);
+      for (let i = 0; i < lines.length; i++) {
+        if ((lines[i] === 'Non-Fatal' && lines[i+1] === 'Shooting') ||
+            lines[i].match(/^Non-Fatal\s+Shooting$/i)) {
+          const startIdx = lines[i] === 'Non-Fatal' ? i + 2 : i + 1;
+          const nums = [];
+          for (let j = startIdx; j < Math.min(startIdx + 20, lines.length) && nums.length < 9; j++) {
+            if (/^-?[\d,]+$/.test(lines[j])) nums.push(parseInt(lines[j].replace(/,/g, '')));
+            else if (/^-?\d+\.?\d*%$/.test(lines[j])) continue;
+            else if (lines[j].match(/^(Carjacking|Homicide|Robbery|Assault|Rape)/i)) break;
+          }
+          console.log('Milwaukee nums from frame:', nums);
+          if (nums.length >= 3) {
+            ytd   = nums[nums.length - 1];
+            prior = nums[nums.length - 2];
+          }
+          break;
+        }
+      }
+      if (ytd !== null) break;
+    } catch(e) { /* cross-origin frame, skip */ }
   }
 
   await browser.close();
 
-  if (ytd === null) throw new Error('Could not find Non-Fatal Shooting YTD values.\nFull text: ' + lines.join(' | '));
+  if (ytd === null) throw new Error('Could not find Non-Fatal Shooting YTD values in any frame.\nTop-level text snippet: ' + fullText.substring(0, 300));
 
   return { ytd, prior, asof };
 }
