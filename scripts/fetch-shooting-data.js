@@ -143,8 +143,8 @@ async function fetchDetroit() {
     }
   }
 
-  // Find Non-Fatal Shooting row
-  const nfsRow = rows.find(r => r.match(/Non.?Fatal\s+Shooting/i));
+  // Find Non-Fatal Shooting row (words may be joined without space)
+  const nfsRow = rows.find(r => r.match(/Non-?Fatal\s*Shooting/i));
   if (!nfsRow) throw new Error('Non-Fatal Shooting row not found. Rows: ' + rows.join(' | '));
 
   // Extract numbers from the row: [priorDay, prior7Days, ytd26, ytd25, change, ...]
@@ -203,27 +203,12 @@ async function fetchDurham() {
   // Need at least 12 numbers (4 groups × 3 years)
   if (allNums.length < 12) throw new Error('Not enough chart numbers: ' + allNums.join(','));
 
-  // Find the block of 12 chart numbers by looking for the sequence starting with Shootings
-  // The largest numbers should be the Shootings group
-  // Try to find where the 12-number block starts
-  let startIdx = 0;
-  for (let i = 0; i <= allNums.length - 12; i++) {
-    // Shootings values are typically the largest (>30), Fatal/NonFatal are smaller (<30)
-    // Check if nums[i..i+2] are all > nums[i+6..i+11] (Shootings > Fatal/NonFatal)
-    const shooting = allNums.slice(i, i+3);
-    const fatal = allNums.slice(i+6, i+9);
-    const nonfatal = allNums.slice(i+9, i+12);
-    if (shooting.every(n => n > 20) && fatal.every(n => n < 30) && nonfatal.every(n => n < 30)) {
-      startIdx = i;
-      break;
-    }
-  }
-
-  const chartNums = allNums.slice(startIdx, startIdx + 12);
-  console.log('Durham chart nums (startIdx=' + startIdx + '):', chartNums);
-  // [Shoot24, Shoot25, Shoot26, PShot24, PShot25, PShot26, Fatal24, Fatal25, Fatal26, NF24, NF25, NF26]
-  const ytd   = chartNums[8] + chartNums[11]; // Fatal2026 + NonFatal2026
-  const prior = chartNums[7] + chartNums[10]; // Fatal2025 + NonFatal2025
+  // Numbers come out in column order (by group across years):
+  // [Shoot24, PShot24, Fatal24, NF24, Shoot25, PShot25, Fatal25, NF25, Shoot26, PShot26, Fatal26, NF26]
+  const chartNums = allNums.slice(0, 12);
+  console.log('Durham chart nums:', chartNums);
+  const ytd   = chartNums[10] + chartNums[11]; // Fatal2026 + NonFatal2026
+  const prior = chartNums[6]  + chartNums[7];  // Fatal2025 + NonFatal2025
 
   return { ytd, prior, asof, adid: latestAdid };
 }
