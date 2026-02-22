@@ -2,18 +2,15 @@ name: Fetch Shooting Data
 
 on:
   schedule:
-    # Run every Thursday at 6pm ET (23:00 UTC) — after Detroit publishes
-    - cron: '0 23 * * 4'
-    # Also run every day at noon UTC for Durham (weekly PDF)
-    - cron: '0 12 * * *'
-  workflow_dispatch:  # Allow manual trigger from GitHub Actions tab
+    - cron: '0 2 * * *'   # Daily at 2am UTC (Detroit PDF drops Thursday evenings ET)
+  workflow_dispatch:       # Manual trigger from Actions tab
 
 jobs:
   fetch-data:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write  # Needed to commit data/manual-auto.json back to repo
+      contents: write
 
     steps:
       - name: Checkout repo
@@ -24,13 +21,15 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install pdfjs-dist
-        run: npm install pdfjs-dist@3.11.174
+      - name: Install dependencies
+        run: |
+          # Install pdfjs-dist and playwright at repo root so the script can require() them
+          npm install pdfjs-dist playwright
+          # Install Playwright's Chromium browser binary
+          npx playwright install chromium --with-deps
 
       - name: Fetch shooting data
         run: node scripts/fetch-shooting-data.js
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Commit updated data
         run: |
@@ -38,5 +37,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data/manual-auto.json
           git diff --staged --quiet || git commit -m "Auto-update shooting data [$(date -u '+%Y-%m-%d %H:%M UTC')]"
-          git pull --rebase origin main
           git push
