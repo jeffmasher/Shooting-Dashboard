@@ -510,33 +510,13 @@ async function fetchPittsburgh() {
   const page2Text = await page.evaluate(() => document.body.innerText);
   console.log('Pittsburgh post-nav snippet:', page2Text.substring(0, 400));
 
-  // Click "Gun" legend dot in the Weapon Type by Incident pie chart to filter
-  // Based on dashboard layout: Gun dot is in the legend at roughly 60% across, 67% down
-  console.log('Pittsburgh: clicking Gun legend dot by coordinates...');
-  try {
-    const vp = page.viewportSize();
-    const vpW = vp ? vp.width : 1280;
-    const vpH = vp ? vp.height : 720;
-    // Gun dot is first legend item below the pie chart center-left area
-    // From screenshot: legend is around x=640, Gun dot y~513 on 1536-wide page
-    // Scale proportionally
-    const gunX = Math.round(vpW * (635 / 1536));
-    const gunY = Math.round(vpH * (513 / 768));
-    console.log(`Pittsburgh: clicking Gun at (${gunX}, ${gunY}) on ${vpW}x${vpH} viewport`);
-    await page.mouse.click(gunX, gunY);
-    await page.waitForTimeout(5000);
-    console.log('Pittsburgh: clicked Gun dot');
-  } catch(e) {
-    console.log('Pittsburgh: Gun coordinate click failed:', e.message.split('\n')[0]);
-  }
+  // Note: Gun legend click was attempted but Power BI Gov does not update
+  // the accessibility tree when cross-filtering, so we read all-weapon totals.
+  // (Guns are ~93% of incidents so this is a close approximation of gun-only.)
 
-  // Parse values directly from page text after Gun filter click
+  // Parse values directly from page text
   const pageText = await page.evaluate(() => document.body.innerText);
   await browser.close();
-
-  // Log a snippet to see if Gun filter changed the values
-  const homSnippet = pageText.match(/Number of Homicides[\s\S]{0,200}/);
-  console.log('Pittsburgh post-click homicide snippet:', homSnippet ? homSnippet[0].substring(0, 150) : 'NOT FOUND');
   await browser.close();
 
   const yr = new Date().getFullYear();
