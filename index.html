@@ -107,6 +107,7 @@
   .type-victims { background: rgba(52,209,122,0.12); color: var(--green); }
   .type-incidents { background: rgba(240,180,41,0.12); color: var(--yellow); }
   .type-non-fatal { background: rgba(100,160,255,0.12); color: #6ab0ff; }
+  .type-hom\+nfs { background: rgba(220,120,255,0.12); color: #d47fff; }
 
   .manual-row { background: rgba(226,255,85,0.03); }
   .manual-row:hover { background: rgba(226,255,85,0.06) !important; }
@@ -991,15 +992,19 @@ var CITIES = [
   {
     id: 'omaha',
     name: 'Omaha, NE',
-    note: 'Shooting Victims (Manual)',
-    type: 'Victims',
-    manual: true,
+    note: 'Homicides + Non-Fatal Shooting Victims (Gun)',
+    type: 'Hom+NFS',
     dataUrl: 'https://police.cityofomaha.org/opd-crime-statistics',
     count: async function(s, e) {
+      if (auto.omaha && auto.omaha.ok) {
+        var asofYear = auto.omaha.asof ? parseInt(auto.omaha.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.omaha.ytd : auto.omaha.prior;
+      }
       var key = 'manual_' + this.id + '_' + s.slice(0,4);
       try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
     },
     latest: async function() {
+      if (auto.omaha && auto.omaha.ok && auto.omaha.asof) return auto.omaha.asof;
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
   },
