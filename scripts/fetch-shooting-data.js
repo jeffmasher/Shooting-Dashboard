@@ -333,17 +333,32 @@ async function fetchMemphis() {
 
   await browser.close();
 
-  const yr  = new Date().getFullYear();
-  const ytdMatch   = chartText.match(new RegExp(yr + ':\s*(\d+)'));
-  const priorMatch = chartText.match(new RegExp((yr-1) + ':\s*(\d+)'));
+  const yr = new Date().getFullYear();
 
-  if (!ytdMatch) throw new Error('Could not find YTD. Chart text: ' + chartText.substring(0, 400));
+  // Chart shows years (2021-2026) then values in same order on separate lines
+  const lines = chartText.split('\n').map(l => l.trim()).filter(Boolean);
 
-  return {
-    ytd:   parseInt(ytdMatch[1]),
-    prior: priorMatch ? parseInt(priorMatch[1]) : null,
-    asof
-  };
+  // Find the last occurrence of the current year
+  const yrIdx = lines.lastIndexOf(String(yr));
+  if (yrIdx === -1) throw new Error('Could not find year ' + yr + '. Lines: ' + lines.slice(0,50).join('|'));
+
+  // Count consecutive years ending at yrIdx
+  let yearCount = 0;
+  for (let i = yrIdx; i >= 0 && parseInt(lines[i]) >= 2020 && parseInt(lines[i]) <= yr; i--) yearCount++;
+
+  // Values follow the year block
+  const vals = [];
+  for (let i = yrIdx + 1; i < lines.length && vals.length < yearCount; i++) {
+    if (/^\d+$/.test(lines[i])) vals.push(parseInt(lines[i]));
+  }
+  console.log('Memphis yearCount:', yearCount, 'vals:', vals);
+
+  if (vals.length < 1) throw new Error('No values found. lines=' + lines.slice(yrIdx, yrIdx+15).join('|'));
+
+  const ytd   = vals[vals.length - 1];
+  const prior = vals.length >= 2 ? vals[vals.length - 2] : null;
+
+  return { ytd, prior, asof };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
