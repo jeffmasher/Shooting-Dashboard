@@ -1,12 +1,15 @@
 {
   "detroit": {
     "ok": false,
-    "error": "Cannot find module 'pdfjs-dist/legacy/build/pdf.js'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
-    "fetchedAt": "2026-02-22T01:04:49.870Z"
+    "error": "Non-Fatal Shooting row not found. Tokens: D|a|i|l|y|O|v|e|r|v|i|e|w|C|r|i|me|R|e|p|o|r|t|C|a|t|e|g|o|r|y|P|r|i|o|r|D|a|y|P|r|i|o|r|7D|a|y|s|2|0|2|6Y|T|D|2|0|2|5Y|T|D",
+    "fetchedAt": "2026-02-22T01:09:28.944Z"
   },
   "durham": {
-    "ok": false,
-    "error": "Cannot find module 'pdfjs-dist/legacy/build/pdf.js'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
-    "fetchedAt": "2026-02-22T01:04:49.870Z"
+    "ytd": 4052,
+    "prior": 4050,
+    "asof": "2026-02-14",
+    "adid": 7554,
+    "fetchedAt": "2026-02-22T01:09:28.944Z",
+    "ok": true
   }
 }
