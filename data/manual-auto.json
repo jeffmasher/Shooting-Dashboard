@@ -2,23 +2,21 @@
   "detroit": {
     "ok": false,
     "error": "Cannot find module '/home/runner/work/Shooting-Dashboard/Shooting-Dashboard/node_modules/pdfjs-dist/legacy/build/pdf.js'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
-    "fetchedAt": "2026-02-22T17:37:04.384Z"
+    "fetchedAt": "2026-02-22T17:45:06.581Z"
   },
   "durham": {
     "ok": false,
     "error": "Cannot find module '/home/runner/work/Shooting-Dashboard/Shooting-Dashboard/node_modules/pdfjs-dist/legacy/build/pdf.js'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
-    "fetchedAt": "2026-02-22T17:37:04.384Z"
+    "fetchedAt": "2026-02-22T17:45:06.581Z"
   },
   "milwaukee": {
     "ok": false,
     "error": "Could not find Non-Fatal Shooting YTD values.\nPage text sample: MILWAUKEE POLICE DEPARTMENT | Part I Crime | Uniform Crime Reporting (UCR) guidelines for Part I Offenses include counting Homicide, Rape, Aggravated Assault, and Human Trafficking offenses by victims. All other offense types are counted by incidents. | Non-Fatal Shootings and Carjackings are a subset of  existing UCR categories and are otherwise already included in Offense totals, counting by victims and incidents respectively. | Incidents without location coordinates available are coded as null locations but included in Citywide totals. Coordinates are aggregated into 0.1 square mile hexagons and defined geographic areas (Police Districts, Squad Areas, Neighborhoods, and Aldermanic Districts) based upon City of Milwaukee Information Technology Management Division (ITMD) Geographic Information Systems (GIS) shapefiles when that information is not otherwise already entered in the Records Management System (RMS). | Incidents are mapped for the prior 365 days. Specific incident locations and names of persons involved have not been included to protect the identity of the individuals. | Information may not yet be fully verified and may include mechanical and/or human error. Preliminary crime classifications may be changed at a later date based upon further investigation(s). | Select Comparison Time | 4-Week to 4-Week | © Mapbox© OSM | 1 | 166 | Select Geography | Police District | Filter | Select Location | Inclusive | (All) | Offense Type | Part I Crime | Non-Fatal | Shooting | Carjacking | Download PDF | Data Current Through: | 2/19/2026 | 2024 | 2025 | % CHANGE | 2024-25 | YTD | 2024 | YTD | 2025 | YTD | 2026 | % CHANGE | YTD | 2024-26 | % CHANGE",
-    "fetchedAt": "2026-02-22T17:37:04.384Z"
+    "fetchedAt": "2026-02-22T17:45:06.581Z"
   },
   "memphis": {
-    "ytd": 116,
-    "prior": 127,
-    "asof": "2026-02-21",
-    "fetchedAt": "2026-02-22T17:37:04.384Z",
-    "ok": true
+    "ok": false,
+    "error": "Could not find 2026: N in chart text. Sample: Show keyboard shortcuts\nShow screen reader tips\nSkip to main content\nPower BI Report\n\nCity of Memphis Safer Communities Dashboard\n\nFigures are preliminary and subject to further review and analysis\n\nCrime Overview\nCrime Summary\nWeekly Crime Trend\nArrests\nCrash Map\nCVI Program Map\nMurder\nSelect a Year\n2021\n2022\n2023\n2024\n2025\n2026\nAggravated Assault\nNon-Fatal Shooting Incidents\n2026: 692025: 92 (-2",
+    "fetchedAt": "2026-02-22T17:45:06.581Z"
   }
 }
