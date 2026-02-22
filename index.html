@@ -157,10 +157,6 @@
 
   footer { margin-top: 32px; padding-top: 20px; border-top: 1px solid var(--border); font-family: 'DM Mono', monospace; font-size: 10px; color: var(--muted); letter-spacing: 1px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; line-height: 1.7; }
 
-  .debug-box { margin-top: 24px; background: #0a0c0f; border: 1px solid var(--border2); border-left: 3px solid var(--accent); padding: 16px 20px; font-family: 'DM Mono', monospace; font-size: 11px; color: var(--muted2); line-height: 1.9; word-break: break-all; }
-  .debug-box .db-title { color: var(--accent); font-size: 10px; letter-spacing: 2px; margin-bottom: 10px; }
-  .debug-box .dl { color: var(--muted); }
-  .debug-box .dv { color: var(--text); }
 
   @media (max-width: 700px) {
     .wrap { padding: 28px 16px 60px; }
@@ -276,14 +272,7 @@
   </div>
 
   <!-- Debug box: shows Chicago field names and exact queries after fetch -->
-  <div class="debug-box" id="debugBox" style="display:none">
-    <div class="db-title">CHICAGO DEBUG INFO</div>
-    <div><span class="dl">Fields in dataset: </span><span class="dv" id="db-fields">—</span></div>
-    <div style="margin-top:8px"><span class="dl">YTD query: </span><span class="dv" id="db-ytd-q">—</span></div>
-    <div><span class="dl">YTD count: </span><span class="dv" id="db-ytd-n">—</span></div>
-    <div style="margin-top:8px"><span class="dl">Prior query: </span><span class="dv" id="db-prior-q">—</span></div>
-    <div><span class="dl">Prior count: </span><span class="dv" id="db-prior-n">—</span></div>
-  </div>
+
 
 </div>
 <script>
@@ -352,41 +341,10 @@ var CITIES = [
     name: 'Chicago, IL',
     note: 'Shooting Victims (GUNSHOT_INJURY_I=YES)',
     _url: 'https://data.cityofchicago.org/resource/gumc-mgzr.json',
-    _debugCall: 0,
     count: async function(s, e) {
       var where = "date >= '" + s + "T00:00:00.000' AND date <= '" + e + "T23:59:59.000' AND gunshot_injury_i = 'YES'";
       var url = this._url;
       var q = url + '?$where=' + encodeURIComponent(where) + '&$select=count(*)%20as%20n&$limit=1';
-      // Log to debug panel
-      this._debugCall++;
-      if (this._debugCall === 1) {
-        document.getElementById('db-ytd-q').textContent = decodeURIComponent(q);
-      } else {
-        document.getElementById('db-prior-q').textContent = decodeURIComponent(q);
-      }
-      document.getElementById('debugBox').style.display = 'block';
-      const r = await fetch(q, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      const d = await r.json();
-      var n = parseInt(d[0] && d[0].n ? d[0].n : 0);
-      if (this._debugCall === 1) {
-        document.getElementById('db-ytd-n').textContent = n;
-      } else {
-        document.getElementById('db-prior-n').textContent = n;
-      }
-      return n;
-    },
-    latest: async function() {
-      return socrataLatest(this._url, 'date', "gunshot_injury_i = 'YES'");
-    },
-    probe: async function() {
-      try {
-        const r = await fetch(this._url + '?$limit=1', { signal: AbortSignal.timeout(10000) });
-        const d = await r.json();
-        if (d[0]) {
-          document.getElementById('db-fields').textContent = Object.keys(d[0]).join(', ');
-          document.getElementById('debugBox').style.display = 'block';
-        }
       } catch(e) {}
     }
   },
@@ -1079,10 +1037,7 @@ async function fetchAll() {
   btn.disabled = true;
   btn.textContent = '↻ Fetching...';
   document.getElementById('exportBtn').disabled = true;
-  document.getElementById('debugBox').style.display = 'none';
 
-  // Reset Chicago debug counter
-  CITIES[0]._debugCall = 0;
   // Reset NYC PDF cache on each refresh
   var nycCity = CITIES.find(function(c) { return c.id === 'nyc'; });
   if (nycCity) nycCity._parsed = null;
@@ -1278,7 +1233,6 @@ function onYearChange() {
   });
   document.getElementById('fetchStatus').textContent = 'Year changed — click Refresh';
   document.getElementById('exportBtn').disabled = true;
-  document.getElementById('debugBox').style.display = 'none';
 }
 
 // ─── CSV EXPORT ───────────────────────────────────────────────────────────────
