@@ -8,6 +8,7 @@ const https = require('https');
 const http  = require('http');
 const fs    = require('fs');
 const path  = require('path');
+const zlib  = require('zlib');
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -28,12 +29,17 @@ function fetchUrl(targetUrl, timeoutMs = 20000, extraHeaders = {}) {
         const redirect = res.headers.location.startsWith('http')
           ? res.headers.location
           : parsed.origin + res.headers.location;
-        return fetchUrl(redirect, timeoutMs).then(resolve).catch(reject);
+        return fetchUrl(redirect, timeoutMs, extraHeaders).then(resolve).catch(reject);
       }
       const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) }));
-      res.on('error', reject);
+      let stream = res;
+      const encoding = res.headers['content-encoding'];
+      if (encoding === 'gzip') stream = res.pipe(zlib.createGunzip());
+      else if (encoding === 'deflate') stream = res.pipe(zlib.createInflate());
+      else if (encoding === 'br') stream = res.pipe(zlib.createBrotliDecompress());
+      stream.on('data', c => chunks.push(c));
+      stream.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) }));
+      stream.on('error', reject);
     });
     req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
     req.on('error', reject);
@@ -298,8 +304,10 @@ async function fetchHampton() {
     const r = await fetchUrl(url, 20000, {
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
       'Accept': 'application/pdf,*/*',
+      'Accept-Encoding': 'gzip, deflate, br',
     });
-    console.log('Hampton HTTP status:', r.status, 'content-type hint:', r.body.slice(0,5).toString());
+    const firstBytes = r.body.slice(0,5).toString('ascii');
+    console.log('Hampton HTTP status:', r.status, 'first bytes:', firstBytes, '(hex:', r.body.slice(0,5).toString('hex'), ')');
     if (r.status === 200) { resp = r; usedUrl = url; break; }
   }
   if (!resp) throw new Error('Hampton PDF not accessible');
