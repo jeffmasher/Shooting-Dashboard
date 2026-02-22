@@ -45,7 +45,9 @@ function fetchUrl(targetUrl, timeoutMs = 20000) {
 
 async function extractPdfTokens(buffer, pageNum = 1) {
   // pdfjs-dist is installed at repo root (node_modules/)
-  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
+  let pdfjsLib;
+  try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
+  catch(e) { pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
   pdfjsLib.GlobalWorkerOptions.workerSrc = false;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
   const page = await pdf.getPage(pageNum);
@@ -144,7 +146,9 @@ async function fetchDurham() {
   if (pdfResp.status !== 200) throw new Error(`Durham PDF HTTP ${pdfResp.status}`);
 
   // Try page 1 for the date, then scan all pages for the data table
-  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
+  let pdfjsLib;
+  try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
+  catch(e) { pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
   pdfjsLib.GlobalWorkerOptions.workerSrc = false;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfResp.body) }).promise;
   const numPages = pdf.numPages;
@@ -246,28 +250,41 @@ async function fetchMilwaukee() {
     asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
   }
 
-  // Find the Non-Fatal Shooting row and grab YTD 2026 and YTD 2025
-  // The table columns are: OFFENSE | Full Year 2024 | Full Year 2025 | %chg | YTD 2024 | YTD 2025 | YTD 2026 | ...
+  // Milwaukee table layout (from page text):
+  // Headers: "2024 | 2025 | %CHANGE | 2024-25 | YTD 2024 | YTD 2025 | YTD 2026 | %CHANGE YTD 2024-26 | %CHANGE"
+  // Then rows: "Non-Fatal Shooting" followed by its numbers, then "Carjacking" row
+  // Strategy: find "Non-Fatal" then "Shooting", collect numbers until next offense type
   const lines = fullText.split('\n').map(l => l.trim()).filter(Boolean);
   let ytd = null, prior = null;
 
+  // Find index of "Non-Fatal" line (the row label)
+  let nfIdx = -1;
   for (let i = 0; i < lines.length; i++) {
-    if (lines[i].match(/Non-Fatal\s+Shooting/i) || (lines[i].match(/Non-Fatal/i) && lines[i+1]?.match(/^Shooting/i))) {
-      // Numbers follow: full2024, full2025, %chg, ytd2024, ytd2025, ytd2026, ...
-      const nums = [];
-      const start = lines[i].match(/Non-Fatal/i) && lines[i+1]?.match(/^Shooting/i) ? i+2 : i+1;
-      for (let j = start; j < Math.min(start+15, lines.length) && nums.length < 7; j++) {
-        const m = lines[j].match(/^-?[\d,]+$/);
-        if (m) nums.push(parseInt(lines[j].replace(/,/g,'')));
-        else if (lines[j].match(/^-?\d+%$/)) continue; // skip % change cells
-      }
-      console.log('Milwaukee nums:', nums);
-      if (nums.length >= 6) {
-        // [full2024, full2025, ytd2024, ytd2025, ytd2026, ...]
-        ytd   = nums[5]; // YTD 2026
-        prior = nums[4]; // YTD 2025
-      }
-      break;
+    if (lines[i] === 'Non-Fatal' && lines[i+1] === 'Shooting') { nfIdx = i; break; }
+    if (lines[i].match(/^Non-Fatal\s+Shooting$/i)) { nfIdx = i; break; }
+  }
+
+  if (nfIdx !== -1) {
+    const startIdx = (lines[nfIdx] === 'Non-Fatal') ? nfIdx + 2 : nfIdx + 1;
+    const nums = [];
+    for (let j = startIdx; j < Math.min(startIdx + 20, lines.length) && nums.length < 9; j++) {
+      if (/^-?[\d,]+$/.test(lines[j])) nums.push(parseInt(lines[j].replace(/,/g, '')));
+      else if (/^-?\d+\.?\d*%$/.test(lines[j])) continue; // skip % values
+      else if (lines[j].match(/^(Carjacking|Homicide|Robbery|Assault)/i)) break;
+    }
+    console.log('Milwaukee nums:', nums);
+    // Columns: full2024, full2025, ytd2024, ytd2025, ytd2026 (may have %change cols too)
+    // Filter out likely %change values (small numbers -100 to 100) vs counts
+    const counts = nums.filter((n, i) => {
+      // The first 2 are full-year counts (larger), next are YTD counts
+      return true; // take all, pick by position
+    });
+    if (counts.length >= 5) {
+      // Expected: [full2024, full2025, ytd2024, ytd2025, ytd2026, ...]
+      prior = counts[counts.length - 2]; // YTD 2025
+      ytd   = counts[counts.length - 1]; // YTD 2026
+      // But only if last value looks like a shooting count (< 500)
+      if (ytd > 500) { prior = counts[3]; ytd = counts[4]; }
     }
   }
 
@@ -335,30 +352,19 @@ async function fetchMemphis() {
 
   const yr = new Date().getFullYear();
 
-  // Chart shows years (2021-2026) then values in same order on separate lines
-  const lines = chartText.split('\n').map(l => l.trim()).filter(Boolean);
+  // Chart title shows "2026: 69" and "2025: 92 (-25%)" - parse directly from title
+  const ytdMatch   = chartText.match(new RegExp(yr + ':\s*(\d+)'));
+  const priorMatch = chartText.match(new RegExp((yr - 1) + ':\s*(\d+)'));
 
-  // Find the last occurrence of the current year
-  const yrIdx = lines.lastIndexOf(String(yr));
-  if (yrIdx === -1) throw new Error('Could not find year ' + yr + '. Lines: ' + lines.slice(0,50).join('|'));
+  console.log('Memphis ytdMatch:', ytdMatch && ytdMatch[0], 'priorMatch:', priorMatch && priorMatch[0]);
 
-  // Count consecutive years ending at yrIdx
-  let yearCount = 0;
-  for (let i = yrIdx; i >= 0 && parseInt(lines[i]) >= 2020 && parseInt(lines[i]) <= yr; i--) yearCount++;
+  if (!ytdMatch) throw new Error('Could not find ' + yr + ': N in chart text. Sample: ' + chartText.substring(0, 400));
 
-  // Values follow the year block
-  const vals = [];
-  for (let i = yrIdx + 1; i < lines.length && vals.length < yearCount; i++) {
-    if (/^\d+$/.test(lines[i])) vals.push(parseInt(lines[i]));
-  }
-  console.log('Memphis yearCount:', yearCount, 'vals:', vals);
-
-  if (vals.length < 1) throw new Error('No values found. lines=' + lines.slice(yrIdx, yrIdx+15).join('|'));
-
-  const ytd   = vals[vals.length - 1];
-  const prior = vals.length >= 2 ? vals[vals.length - 2] : null;
-
-  return { ytd, prior, asof };
+  return {
+    ytd:   parseInt(ytdMatch[1]),
+    prior: priorMatch ? parseInt(priorMatch[1]) : null,
+    asof
+  };
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
