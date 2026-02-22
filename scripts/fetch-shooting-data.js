@@ -99,13 +99,17 @@ async function fetchDetroit() {
   const tokens = await extractPdfTokens(resp.body);
   const text = tokens.join(' ');
 
-  // Date
+  // Date - try text first, fall back to URL filename (YYMMDD e.g. 260219 = 2026-02-19)
   const dateMatch = text.match(/\w+day,\s+(\w+)\s+(\d{1,2}),\s+(\d{4})/i);
   let asof = null;
   if (dateMatch) {
     const months = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
     const mo = months[dateMatch[1].toLowerCase()];
     asof = `${dateMatch[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dateMatch[2])).padStart(2,'0')}`;
+  }
+  if (!asof) {
+    const fnMatch = pdfUrl.match(/\/(\d{2})(\d{2})(\d{2})%20DPD/);
+    if (fnMatch) asof = `20${fnMatch[1]}-${fnMatch[2]}-${fnMatch[3]}`;
   }
 
   // Join all tokens and search for Non-Fatal Shooting row
@@ -130,7 +134,7 @@ async function fetchDetroit() {
 // ─── Durham ───────────────────────────────────────────────────────────────────
 
 async function fetchDurham() {
-  // Durham PDF is an image-based bar chart - use Claude vision API to extract numbers
+  // Durham PDF contains an image-based bar chart - render via pdfjs + canvas, send to Claude vision
   const archiveUrl = 'https://www.durhamnc.gov/Archive.aspx?AMID=211';
   console.log('Durham archive URL:', archiveUrl);
   const archResp = await fetchUrl(archiveUrl);
@@ -141,17 +145,17 @@ async function fetchDurham() {
   if (!adidMatches.length) throw new Error('No ADID links found');
   const latestAdid = Math.max(...adidMatches);
   const pdfUrl = `https://www.durhamnc.gov/ArchiveCenter/ViewFile/Item/${latestAdid}`;
-
   console.log('Durham PDF URL:', pdfUrl, '(ADID:', latestAdid + ')');
+
   const pdfResp = await fetchUrl(pdfUrl);
   if (pdfResp.status !== 200) throw new Error(`Durham PDF HTTP ${pdfResp.status}`);
 
-  // Get as-of date from PDF text layer (title text is accessible even if chart is image)
+  // Get as-of date from PDF text layer
   const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
   pdfjsLib.GlobalWorkerOptions.workerSrc = false;
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfResp.body) }).promise;
-  const pg = await pdf.getPage(1);
-  const tc = await pg.getTextContent();
+  const pg1 = await pdf.getPage(1);
+  const tc  = await pg1.getTextContent();
   const text = tc.items.map(i => i.str).join(' ');
   const dateMatch = text.match(/through\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
   let asof = null;
@@ -160,25 +164,20 @@ async function fetchDurham() {
     const mo = months[dateMatch[1].toLowerCase()];
     if (mo) asof = `${dateMatch[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dateMatch[2])).padStart(2,'0')}`;
   }
+  console.log('Durham asof:', asof);
 
-  // Render PDF as image using Playwright - embed PDF bytes as data URI to avoid download trigger
-  const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  // Embed PDF in an HTML page so Playwright renders it without triggering download
-  const pdfBase64 = pdfResp.body.toString('base64');
-  const htmlContent = `<html><body style="margin:0"><embed src="data:application/pdf;base64,${pdfBase64}" width="1200" height="900" type="application/pdf"></body></html>`;
-  await page.setContent(htmlContent, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(3000);
-  const screenshotBuf = await page.screenshot({ fullPage: false });
-  await browser.close();
+  // Render PDF page to PNG using pdfjs + node-canvas
+  const { createCanvas } = require('canvas');
+  const viewport = pg1.getViewport({ scale: 2.0 });
+  const canvas  = createCanvas(viewport.width, viewport.height);
+  const ctx     = canvas.getContext('2d');
+  await pg1.render({ canvasContext: ctx, viewport }).promise;
+  const pngBuf = canvas.toBuffer('image/png');
+  console.log('Durham: rendered PDF to PNG, size:', pngBuf.length, 'bytes');
 
-  const base64Image = screenshotBuf.toString('base64');
-  console.log('Durham: screenshot taken, size:', screenshotBuf.length, 'bytes');
+  const base64Image = pngBuf.toString('base64');
 
-  // Call Claude API to extract chart values
-  const claudeResp = await fetchUrl('https://api.anthropic.com/v1/messages');
-  // Use https.request directly for POST with body
+  // Send to Claude vision API
   const claudeData = await new Promise((resolve, reject) => {
     const body = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
@@ -214,15 +213,12 @@ async function fetchDurham() {
     req.end();
   });
 
-  console.log('Durham Claude response:', JSON.stringify(claudeData).substring(0, 300));
   const responseText = claudeData.content?.[0]?.text || '';
   console.log('Durham vision response:', responseText);
 
-  const m2024 = responseText.match(/2024=(\d+)/);
   const m2025 = responseText.match(/2025=(\d+)/);
   const m2026 = responseText.match(/2026=(\d+)/);
-
-  if (!m2026) throw new Error('Could not parse Durham chart values from vision API. Response: ' + responseText);
+  if (!m2026) throw new Error('Could not parse Durham chart values. Response: ' + responseText);
 
   return {
     ytd:   parseInt(m2026[1]),
@@ -230,6 +226,7 @@ async function fetchDurham() {
     asof
   };
 }
+
 
 // ─── Milwaukee (Tableau) ──────────────────────────────────────────────────────
 
