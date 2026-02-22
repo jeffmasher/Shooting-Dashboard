@@ -2,7 +2,7 @@ name: Fetch Shooting Data
 
 on:
   schedule:
-    - cron: '0 2 * * *'   # Daily at 2am UTC (Detroit PDF drops Thursday evenings ET)
+    - cron: '0 2 * * *'   # Daily at 2am UTC
   workflow_dispatch:       # Manual trigger from Actions tab
 
 jobs:
@@ -22,11 +22,17 @@ jobs:
           node-version: '20'
 
       - name: Install dependencies
-        run: |
-          # Install pdfjs-dist and playwright at repo root so the script can require() them
-          npm install pdfjs-dist playwright
-          # Install Playwright's Chromium browser binary
-          npx playwright install chromium --with-deps
+        run: npm install pdfjs-dist playwright
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-chromium-${{ runner.os }}
+          restore-keys: playwright-chromium-
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium
 
       - name: Fetch shooting data
         run: node scripts/fetch-shooting-data.js
