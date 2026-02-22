@@ -25,10 +25,12 @@ jobs:
           node-version: '20'
 
       - name: Install pdfjs-dist
-        run: npm install pdfjs-dist --prefix scripts
+        run: npm install pdfjs-dist@3.11.174
 
       - name: Fetch shooting data
         run: node scripts/fetch-shooting-data.js
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Commit updated data
         run: |
