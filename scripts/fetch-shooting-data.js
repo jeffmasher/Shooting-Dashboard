@@ -371,6 +371,7 @@ async function fetchHampton() {
   const mediaType = hex.startsWith('ffd8') ? 'image/jpeg' : hex.startsWith('8950') ? 'image/png' : 'image/jpeg';
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
+  console.log('Hampton API key present:', !!apiKey, 'length:', apiKey ? apiKey.length : 0);
   if (!apiKey) throw new Error('ANTHROPIC_API_KEY not set');
 
   // Call Claude vision to extract the table data
