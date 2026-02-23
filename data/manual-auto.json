@@ -3,49 +3,49 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   },
   "durham": {
     "ytd": 12,
     "prior": 18,
     "asof": "2026-02-14",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 39,
     "prior": 54,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   },
   "memphis": {
     "ytd": 69,
     "prior": 94,
     "asof": "2026-02-22",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
-    "asof": "2026-01-31",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "asof": "2025-01-31",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   },
   "omaha": {
     "ytd": 0,
     "prior": 8,
     "asof": "2026-02-04",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 12,
     "asof": "2026-02-22",
-    "fetchedAt": "2026-02-23T00:42:36.503Z",
+    "fetchedAt": "2026-02-23T00:55:21.656Z",
     "ok": true
   }
 }
