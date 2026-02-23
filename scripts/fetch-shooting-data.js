@@ -583,28 +583,34 @@ async function fetchPittsburgh() {
 
 async function fetchOmaha() {
   // Use Playwright to get the rendered page (JS-rendered links)
-  const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true });
-  const page = await browser.newPage();
-  page.setDefaultTimeout(30000);
-  await page.goto('https://police.cityofomaha.org/opd-crime-statistics', { waitUntil: 'networkidle', timeout: 30000 });
-
-  // Find the PDF link containing "Non-Fatal" or "Homicide"
-  const pdfUrl = await page.evaluate(() => {
-    const links = Array.from(document.querySelectorAll('a[href]'));
-    const match = links.find(a => /non.?fatal|homicide/i.test(a.textContent + a.href) && /\.pdf/i.test(a.href));
-    if (match) return match.href;
-    // Fallback: any PDF link on the page
-    const anyPdf = links.find(a => /\.pdf/i.test(a.href));
-    return anyPdf ? anyPdf.href : null;
-  });
-  await browser.close();
-
-  if (!pdfUrl) throw new Error('Could not find Omaha PDF link on stats page');
-  console.log('Omaha PDF URL:', pdfUrl);
-
-  const pdfRes = await fetchUrl(pdfUrl, 30000);
-  const pdfBuf = pdfRes.body;
+  // The OPD site is fully JS-rendered so we can't scrape it.
+  // Instead, fetch the PDF directly using the known URL pattern.
+  // URL format: /images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_MMDDYYYY.pdf
+  // We try recent dates going backwards from today to find the current file.
+  
+  let pdfUrl = null;
+  let pdfBuf = null;
+  const now = new Date();
+  
+  for (let daysBack = 0; daysBack <= 60; daysBack++) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - daysBack);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const candidate = `https://police.cityofomaha.org/images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_${mm}${dd}${yyyy}.pdf`;
+    try {
+      const res = await fetchUrl(candidate, 10000);
+      if (res.status === 200 && res.body.length > 1000) {
+        pdfUrl = candidate;
+        pdfBuf = res.body;
+        console.log('Omaha PDF URL:', pdfUrl);
+        break;
+      }
+    } catch(e) { /* try next date */ }
+  }
+  
+  if (!pdfBuf) throw new Error('Could not find current Omaha PDF (tried last 60 days)');
 
   // Parse all pages to find the YTD row for current year
   let pdfjsLib;
