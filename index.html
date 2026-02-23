@@ -996,6 +996,8 @@ var CITIES = [
     type: 'Hom+NFS',
     dataUrl: 'https://police.cityofomaha.org/opd-crime-statistics',
     count: async function(s, e) {
+      var auto = await loadAutoData();
+      var windowYear = parseInt(s.slice(0,4));
       if (auto.omaha && auto.omaha.ok) {
         var asofYear = auto.omaha.asof ? parseInt(auto.omaha.asof.slice(0,4)) : CURRENT_YEAR;
         return windowYear === asofYear ? auto.omaha.ytd : auto.omaha.prior;
@@ -1004,6 +1006,7 @@ var CITIES = [
       try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
     },
     latest: async function() {
+      var auto = await loadAutoData();
       if (auto.omaha && auto.omaha.ok && auto.omaha.asof) return auto.omaha.asof;
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
