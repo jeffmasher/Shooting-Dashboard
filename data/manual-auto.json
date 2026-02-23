@@ -3,47 +3,47 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-23T00:12:32.286Z",
+    "fetchedAt": "2026-02-23T00:31:55.588Z",
     "ok": true
   },
   "durham": {
     "ytd": 12,
     "prior": 18,
     "asof": "2026-02-14",
-    "fetchedAt": "2026-02-23T00:12:32.286Z",
+    "fetchedAt": "2026-02-23T00:31:55.588Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 39,
     "prior": 54,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-23T00:12:32.286Z",
+    "fetchedAt": "2026-02-23T00:31:55.588Z",
     "ok": true
   },
   "memphis": {
     "ytd": 69,
     "prior": 94,
     "asof": "2026-02-22",
-    "fetchedAt": "2026-02-23T00:12:32.286Z",
+    "fetchedAt": "2026-02-23T00:31:55.588Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
-    "asof": "2025-01-31",
-    "fetchedAt": "2026-02-23T00:12:32.286Z",
+    "asof": "2026-01-31",
+    "fetchedAt": "2026-02-23T00:31:55.588Z",
     "ok": true
   },
   "omaha": {
     "ok": false,
     "error": "Could not find current Omaha PDF (tried last 60 days)",
-    "fetchedAt": "2026-02-23T00:12:32.286Z"
+    "fetchedAt": "2026-02-23T00:31:55.588Z"
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 12,
     "asof": "2026-02-22",
-    "fetchedAt": "2026-02-23T00:12:32.286Z",
+    "fetchedAt": "2026-02-23T00:31:55.588Z",
     "ok": true
   }
 }
