@@ -1014,16 +1014,22 @@ var CITIES = [
   {
     id: 'miamidade',
     name: 'Miami-Dade County, FL',
-    note: 'Shooting Victims (Manual)',
-    type: 'Victims',
-    manual: true,
+    note: 'Shootings (Power BI)',
+    type: 'Incidents',
     dataUrl: 'https://www.miamidade.gov/global/police/crime-stats.page',
     count: async function(s, e) {
-      var key = 'manual_' + this.id + '_' + s.slice(0,4);
-      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
+      var auto = await loadAutoData();
+      var windowYear = parseInt(s.slice(0,4));
+      if (auto.miamidade && auto.miamidade.ok) {
+        var asofYear = auto.miamidade.asof ? parseInt(auto.miamidade.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.miamidade.ytd : auto.miamidade.prior;
+      }
+      return null;
     },
     latest: async function() {
-      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+      var auto = await loadAutoData();
+      if (auto.miamidade && auto.miamidade.ok && auto.miamidade.asof) return auto.miamidade.asof;
+      return null;
     }
   },
   {
