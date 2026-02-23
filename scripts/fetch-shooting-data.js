@@ -588,9 +588,16 @@ async function fetchOmaha() {
   // URL format: /images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_MMDDYYYY.pdf
   // We try recent dates going backwards from today to find the current file.
   
-  let pdfUrl = null;
-  let pdfBuf = null;
+  // police.cityofomaha.org blocks plain HTTP clients - use Playwright instead
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const page = await context.newPage();
+  
+  // Try recent dates to find the current PDF
   const now = new Date();
+  let pdfBuf = null;
+  let pdfUrl = null;
   
   for (let daysBack = 0; daysBack <= 60; daysBack++) {
     const d = new Date(now);
@@ -599,17 +606,25 @@ async function fetchOmaha() {
     const dd = String(d.getDate()).padStart(2, '0');
     const yyyy = d.getFullYear();
     const candidate = `https://police.cityofomaha.org/images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_${mm}${dd}${yyyy}.pdf`;
+    
     try {
-      const res = await fetchUrl(candidate, 10000);
-      if (res.status === 200 && res.body.length > 1000) {
-        pdfUrl = candidate;
-        pdfBuf = res.body;
-        console.log('Omaha PDF URL:', pdfUrl);
-        break;
+      const response = await page.goto(candidate, { waitUntil: 'load', timeout: 15000 });
+      const status = response ? response.status() : 0;
+      if (daysBack <= 25) console.log(`Omaha candidate ${mm}${dd}${yyyy}: status=${status}`);
+      if (status === 200) {
+        pdfBuf = await response.body();
+        if (pdfBuf.length > 1000) {
+          pdfUrl = candidate;
+          console.log('Omaha PDF found:', pdfUrl, 'size:', pdfBuf.length);
+          break;
+        }
       }
-    } catch(e) { /* try next date */ }
+    } catch(e) {
+      if (daysBack <= 3) console.log(`Omaha ${mm}${dd}${yyyy} error:`, e.message.split('\n')[0]);
+    }
   }
   
+  await browser.close();
   if (!pdfBuf) throw new Error('Could not find current Omaha PDF (tried last 60 days)');
 
   // Parse all pages to find the YTD row for current year
