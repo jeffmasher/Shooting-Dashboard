@@ -588,44 +588,14 @@ async function fetchOmaha() {
   // URL format: /images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_MMDDYYYY.pdf
   // We try recent dates going backwards from today to find the current file.
   
-  // police.cityofomaha.org blocks plain HTTP clients - use Playwright instead
-  const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  
-  // Try recent dates to find the current PDF
-  const now = new Date();
-  let pdfBuf = null;
-  let pdfUrl = null;
-  
-  for (let daysBack = 0; daysBack <= 60; daysBack++) {
-    const d = new Date(now);
-    d.setDate(d.getDate() - daysBack);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    const yyyy = d.getFullYear();
-    const candidate = `https://police.cityofomaha.org/images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_${mm}${dd}${yyyy}.pdf`;
-    
-    try {
-      const response = await page.goto(candidate, { waitUntil: 'load', timeout: 15000 });
-      const status = response ? response.status() : 0;
-      if (daysBack <= 25) console.log(`Omaha candidate ${mm}${dd}${yyyy}: status=${status}`);
-      if (status === 200) {
-        pdfBuf = await response.body();
-        if (pdfBuf.length > 1000) {
-          pdfUrl = candidate;
-          console.log('Omaha PDF found:', pdfUrl, 'size:', pdfBuf.length);
-          break;
-        }
-      }
-    } catch(e) {
-      if (daysBack <= 3) console.log(`Omaha ${mm}${dd}${yyyy} error:`, e.message.split('\n')[0]);
-    }
+  // police.cityofomaha.org returns 403 from GitHub Actions IPs.
+  // Instead, commit the latest PDF to data/omaha-shootings.pdf and read it locally.
+  const pdfPath = require('path').join(__dirname, '..', 'data', 'omaha-shootings.pdf');
+  if (!require('fs').existsSync(pdfPath)) {
+    throw new Error('Omaha PDF not found at data/omaha-shootings.pdf — please commit the latest PDF from https://police.cityofomaha.org/opd-crime-statistics');
   }
-  
-  await browser.close();
-  if (!pdfBuf) throw new Error('Could not find current Omaha PDF (tried last 60 days)');
+  const pdfBuf = require('fs').readFileSync(pdfPath);
+  console.log('Omaha PDF loaded from local file, size:', pdfBuf.length);
 
   // Parse all pages to find the YTD row for current year
   let pdfjsLib;
