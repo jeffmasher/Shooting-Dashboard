@@ -636,35 +636,30 @@ async function fetchOmaha() {
   const yrIdx = tokens.findIndex(t => t === String(yr));
   const priorYrIdx = tokens.findIndex(t => t === String(yr - 1));
 
-  function extractYtdFromRow(startIdx) {
+  function extractYtdFromRow(startIdx, useFirst = false) {
     if (startIdx < 0) return null;
-    // Collect all tokens in this year's row until next 4-digit year
     const rowTokens = [];
     for (let i = startIdx + 1; i < tokens.length && i < startIdx + 300; i++) {
       const t = tokens[i];
       if (/^\d{4}$/.test(t) && parseInt(t) >= 2020) break;
       rowTokens.push(t);
     }
-    // Extract only numeric values
     const nums = rowTokens.filter(t => /^\d+$/.test(t)).map(Number);
-    console.log(`Omaha row starting at ${startIdx}: nums=`, nums.slice(0, 60));
-    console.log(`  rowTokens (first 30):`, rowTokens.slice(0, 30));
-    if (nums.length >= 4) {
-      // The row contains monthly data then YTD. Find the last group of 4 consecutive non-zero nums.
-      // Walk backwards to find 4 non-zero values
-      const nonZeroNums = nums.filter(n => n > 0);
-      console.log(`  nonZeroNums (last 8):`, nonZeroNums.slice(-8));
-      if (nonZeroNums.length >= 4) {
-        const n = nonZeroNums.length;
-        // YTD last 4: NFS_I, NFS_V, HOM_I, HOM_V
-        return { nfsV: nonZeroNums[n - 3], homV: nonZeroNums[n - 1] };
+    const nonZeroNums = nums.filter(n => n > 0);
+    if (nonZeroNums.length >= 4) {
+      const n = nonZeroNums.length;
+      // For current year: last 4 non-zero = YTD (NFS_I, NFS_V, HOM_I, HOM_V)
+      // For prior year: first 4 non-zero = Jan data (same-period comparison)
+      if (useFirst) {
+        return { nfsV: nonZeroNums[1], homV: nonZeroNums[3] };
       }
+      return { nfsV: nonZeroNums[n - 3], homV: nonZeroNums[n - 1] };
     }
     return null;
   }
 
-  const ytdData   = extractYtdFromRow(yrIdx);
-  const priorData = extractYtdFromRow(priorYrIdx);
+  const ytdData   = extractYtdFromRow(yrIdx, false);
+  const priorData = extractYtdFromRow(priorYrIdx, true);
 
   console.log(`Omaha ytd data:`, ytdData, `prior data:`, priorData);
 
@@ -679,8 +674,15 @@ async function fetchOmaha() {
 
 
 async function main() {
-  const results = {};
   const fetchedAt = new Date().toISOString();
+  const outDir = path.join(__dirname, '..', 'data');
+  const outPath = path.join(outDir, 'manual-auto.json');
+
+  // Load existing output to preserve manually-updated cities (Omaha)
+  let existing = {};
+  try { existing = JSON.parse(fs.readFileSync(outPath, 'utf8')); } catch (e) { /* first run */ }
+
+  const results = {};
 
   // Detroit
   try {
@@ -732,15 +734,9 @@ async function main() {
     results.hampton = { ok: false, error: e.message, fetchedAt };
   }
 
-  // Omaha
-  try {
-    console.log('\n--- Fetching Omaha ---');
-    results.omaha = { ...(await fetchOmaha()), fetchedAt, ok: true };
-    console.log('Omaha:', results.omaha);
-  } catch (e) {
-    console.error('Omaha error:', e.message);
-    results.omaha = { ok: false, error: e.message, fetchedAt };
-  }
+  // Omaha — manually updated, preserve existing value from manual-auto.json
+  results.omaha = existing.omaha || { ok: false, error: 'No manual data yet' };
+  console.log('Omaha (manual):', results.omaha);
 
   // Pittsburgh (90s hard timeout to prevent hanging)
   try {
@@ -754,9 +750,7 @@ async function main() {
   }
 
   // Write output
-  const outDir = path.join(__dirname, '..', 'data');
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
-  const outPath = path.join(outDir, 'manual-auto.json');
   fs.writeFileSync(outPath, JSON.stringify(results, null, 2));
   console.log('\nWrote', outPath);
   console.log(JSON.stringify(results, null, 2));
