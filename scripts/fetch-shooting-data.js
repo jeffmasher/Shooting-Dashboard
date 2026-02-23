@@ -582,20 +582,25 @@ async function fetchPittsburgh() {
 // Fetches the OPD Non-Fatal Shootings and Homicides PDF and sums YTD V columns
 
 async function fetchOmaha() {
-  const pageRes = await fetchUrl('https://police.cityofomaha.org/opd-crime-statistics', 25000);
-  const html = pageRes.body.toString('utf8');
+  // Use Playwright to get the rendered page (JS-rendered links)
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  page.setDefaultTimeout(30000);
+  await page.goto('https://police.cityofomaha.org/opd-crime-statistics', { waitUntil: 'networkidle', timeout: 30000 });
 
-  // Find link to the Non-Fatal Shootings and Homicides PDF
-  const pdfMatch = html.match(/href="([^"]*(?:non.?fatal|nonfatal|shooting[^"]*homicide|homicide[^"]*shooting)[^"]*\.pdf)"/i)
-    || html.match(/href="([^"]*opd[^"]*\.pdf)"/i)
-    || html.match(/href="([^"]*\.pdf)"/i);
+  // Find the PDF link containing "Non-Fatal" or "Homicide"
+  const pdfUrl = await page.evaluate(() => {
+    const links = Array.from(document.querySelectorAll('a[href]'));
+    const match = links.find(a => /non.?fatal|homicide/i.test(a.textContent + a.href) && /\.pdf/i.test(a.href));
+    if (match) return match.href;
+    // Fallback: any PDF link on the page
+    const anyPdf = links.find(a => /\.pdf/i.test(a.href));
+    return anyPdf ? anyPdf.href : null;
+  });
+  await browser.close();
 
-  if (!pdfMatch) throw new Error('Could not find Omaha PDF link on stats page');
-
-  let pdfUrl = pdfMatch[1];
-  if (!pdfUrl.startsWith('http')) {
-    pdfUrl = 'https://police.cityofomaha.org' + (pdfUrl.startsWith('/') ? '' : '/') + pdfUrl;
-  }
+  if (!pdfUrl) throw new Error('Could not find Omaha PDF link on stats page');
   console.log('Omaha PDF URL:', pdfUrl);
 
   const pdfRes = await fetchUrl(pdfUrl, 30000);
