@@ -36,7 +36,7 @@
   },
   "omaha": {
     "ytd": 2,
-    "prior": 3,
+    "prior": 8,
     "asof": "2026-02-04",
     "fetchedAt": "2026-02-23T02:03:22.801Z",
     "ok": true
