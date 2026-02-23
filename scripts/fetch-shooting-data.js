@@ -638,24 +638,26 @@ async function fetchOmaha() {
 
   function extractYtdFromRow(startIdx) {
     if (startIdx < 0) return null;
-    // Collect all numeric tokens in this year's row until next 4-digit year or end
-    const nums = [];
-    for (let i = startIdx + 1; i < tokens.length && i < startIdx + 200; i++) {
+    // Collect all tokens in this year's row until next 4-digit year
+    const rowTokens = [];
+    for (let i = startIdx + 1; i < tokens.length && i < startIdx + 300; i++) {
       const t = tokens[i];
-      if (/^\d{4}$/.test(t) && parseInt(t) >= 2020) break; // next year row
-      if (/^\d+$/.test(t)) nums.push(parseInt(t));
+      if (/^\d{4}$/.test(t) && parseInt(t) >= 2020) break;
+      rowTokens.push(t);
     }
+    // Extract only numeric values
+    const nums = rowTokens.filter(t => /^\d+$/.test(t)).map(Number);
     console.log(`Omaha row starting at ${startIdx}: nums=`, nums.slice(0, 60));
+    console.log(`  rowTokens (first 30):`, rowTokens.slice(0, 30));
     if (nums.length >= 4) {
-      // Strip trailing zeros (unfilled months render as 0)
-      const nonZero = [];
-      for (let i = 0; i < nums.length; i++) nonZero.push(nums[i]);
-      while (nonZero.length && nonZero[nonZero.length - 1] === 0) nonZero.pop();
-      console.log(`  nonZero tail (last 10):`, nonZero.slice(-10));
-      // Last 4 non-zero values are YTD: NFS_I, NFS_V, HOM_I, HOM_V
-      if (nonZero.length >= 4) {
-        const n = nonZero.length;
-        return { nfsV: nonZero[n - 3], homV: nonZero[n - 1] };
+      // The row contains monthly data then YTD. Find the last group of 4 consecutive non-zero nums.
+      // Walk backwards to find 4 non-zero values
+      const nonZeroNums = nums.filter(n => n > 0);
+      console.log(`  nonZeroNums (last 8):`, nonZeroNums.slice(-8));
+      if (nonZeroNums.length >= 4) {
+        const n = nonZeroNums.length;
+        // YTD last 4: NFS_I, NFS_V, HOM_I, HOM_V
+        return { nfsV: nonZeroNums[n - 3], homV: nonZeroNums[n - 1] };
       }
     }
     return null;
