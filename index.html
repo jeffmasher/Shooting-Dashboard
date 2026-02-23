@@ -996,8 +996,6 @@ var CITIES = [
     type: 'Hom+NFS',
     dataUrl: 'https://police.cityofomaha.org/opd-crime-statistics',
     count: async function(s, e) {
-      var auto = await loadAutoData();
-      var windowYear = parseInt(s.slice(0,4));
       if (auto.omaha && auto.omaha.ok) {
         var asofYear = auto.omaha.asof ? parseInt(auto.omaha.asof.slice(0,4)) : CURRENT_YEAR;
         return windowYear === asofYear ? auto.omaha.ytd : auto.omaha.prior;
@@ -1006,7 +1004,6 @@ var CITIES = [
       try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
     },
     latest: async function() {
-      var auto = await loadAutoData();
       if (auto.omaha && auto.omaha.ok && auto.omaha.asof) return auto.omaha.asof;
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
     }
@@ -1282,7 +1279,7 @@ function render() {
     }
 
     if (s.status === 'loading') {
-      return divider + '<tr><td><div class="city-name"><span class="dot dot-loading"></span>' + city.name + '</div><div class="city-note">' + city.note + '</div></td>' +
+      return divider + '<tr><td><div class="city-name"><span class="dot dot-loading"></span>' + city.name + '</div></td>' +
         '<td class="num"><span class="sk" style="width:52px"></span></td>' +
         '<td class="num"><span class="sk" style="width:52px"></span></td>' +
         '<td class="chg"><span class="sk" style="width:60px"></span></td>' +
@@ -1290,7 +1287,7 @@ function render() {
     }
 
     if (s.status === 'error') {
-      return divider + '<tr><td><div class="city-name"><span class="dot dot-error"></span>' + city.name + '</div><div class="city-note">' + city.note + '</div></td>' +
+      return divider + '<tr><td><div class="city-name"><span class="dot dot-error"></span>' + city.name + '</div></td>' +
         '<td colspan="4"><span class="err-msg">' + (s.err || 'Fetch failed') + '</span></td><td class="type-badge"></td></tr>';
     }
 
@@ -1304,7 +1301,7 @@ function render() {
 
     var manualBtn = city.manual ? ' <button class="manual-btn" onclick="openManual(\'' + city.id + '\')" title="Edit">✎ Edit</button>' + (city.dataUrl ? ' <a class="manual-btn" href="' + city.dataUrl + '" target="_blank" title="Open source">↗ Source</a>' : '') : '';
     return divider + '<tr' + (city.manual ? ' class="manual-row"' : '') + '>' +
-      '<td><div class="city-name"><span class="dot dot-ok"></span>' + city.name + manualBtn + '</div><div class="city-note">' + city.note + '</div></td>' +
+      '<td><div class="city-name"><span class="dot dot-ok"></span>' + city.name + manualBtn + '</div></td>' +
       '<td class="num">' + (s.ytd != null ? s.ytd.toLocaleString() : '—') + '</td>' +
       '<td class="num" style="color:var(--muted2)">' + (s.prior != null ? s.prior.toLocaleString() : '—') + '<div style="font-family:var(--muted);font-size:9px;color:var(--muted);margin-top:2px">thru ' + (s.priorEnd || '') + '</div></td>' +
       '<td class="chg">' + chgHtml + '</td>' +
