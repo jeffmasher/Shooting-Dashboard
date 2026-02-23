@@ -616,7 +616,7 @@ async function fetchMiamiDade() {
   console.log('MiamiDade PBI page1 sample:', page1Text.substring(0, 600));
 
   // Extract as-of date from "Last update date: MM/DD/YYYY"
-  const dateMatch = page1Text.match(/Last update date[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  const dateMatch = page1Text.match(/Last update dat[ae][:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   let asof = null;
   if (dateMatch) {
     asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
