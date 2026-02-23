@@ -585,14 +585,35 @@ async function fetchMiamiDade() {
   await page.setViewportSize({ width: 1536, height: 768 });
   page.setDefaultTimeout(30000);
 
-  // The crime stats page redirects to a Power BI embed
+  // Load the wrapper page and find the Power BI iframe src
   const url = 'https://www.miamidade.gov/global/police/crime-stats.page';
-  console.log('MiamiDade: loading Power BI dashboard...');
+  console.log('MiamiDade: loading wrapper page...');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(10000);
+
+  // Find iframe src containing powerbi
+  const iframeSrc = await page.evaluate(() => {
+    const frames = Array.from(document.querySelectorAll('iframe'));
+    const pbi = frames.find(f => f.src && f.src.includes('powerbi'));
+    return pbi ? pbi.src : null;
+  });
+  console.log('MiamiDade iframe src:', iframeSrc);
+
+  if (!iframeSrc) {
+    // Log page source snippet to help debug
+    const src = await page.content();
+    console.log('MiamiDade page source snippet:', src.substring(0, 2000));
+    await browser.close();
+    throw new Error('Could not find Power BI iframe on Miami-Dade page');
+  }
+
+  // Navigate directly to the Power BI embed
+  console.log('MiamiDade: loading Power BI embed directly...');
+  await page.goto(iframeSrc, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(20000);
 
   const page1Text = await page.evaluate(() => document.body.innerText);
-  console.log('MiamiDade page1 sample:', page1Text.substring(0, 600));
+  console.log('MiamiDade PBI page1 sample:', page1Text.substring(0, 600));
 
   // Extract as-of date from "Last update date: MM/DD/YYYY"
   const dateMatch = page1Text.match(/Last update date[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
@@ -602,29 +623,34 @@ async function fetchMiamiDade() {
   }
   console.log('MiamiDade asof:', asof);
 
-  // Navigate to page 3 - try clicking the third page tab or next button twice
+  // Navigate to page 3 by clicking next twice
   console.log('MiamiDade: navigating to page 3...');
   for (let i = 0; i < 2; i++) {
     try {
       await page.locator('.pbi-glyph-chevronrightmedium').first().click({ force: true, timeout: 5000 });
       await page.waitForTimeout(5000);
-    } catch(e) { console.log('MiamiDade: nav click failed:', e.message); }
+      console.log(`MiamiDade: clicked next (${i+1}/2)`);
+    } catch(e) {
+      // Try aria-label next button
+      try {
+        await page.locator('[aria-label="Next page"]').first().click({ force: true, timeout: 3000 });
+        await page.waitForTimeout(5000);
+        console.log(`MiamiDade: clicked Next page button (${i+1}/2)`);
+      } catch(e2) {
+        console.log(`MiamiDade: nav click ${i+1} failed:`, e.message);
+      }
+    }
   }
 
   const page3Text = await page.evaluate(() => document.body.innerText);
-  console.log('MiamiDade page3 sample:', page3Text.substring(0, 800));
+  console.log('MiamiDade page3 sample:', page3Text.substring(0, 1000));
   await browser.close();
 
   const yr = new Date().getFullYear();
-
-  // The YTD table has rows like: SHOOTINGS  15  -40%  25  -11%  28  ...
-  // Text layout: "SHOOTINGS\n15\n-40%\n25\n-11%\n..."
-  // We want: 2026 count (col1) and 2025 count (col2)
-  // Try to find SHOOTINGS row in the YTD section
   let ytd = null, prior = null;
 
-  // Strategy 1: find SHOOTINGS followed by numbers
-  const shootMatch = page3Text.match(/SHOOTINGS[\s\S]{0,200}/i);
+  // Strategy 1: find SHOOTINGS followed by number+percent pairs
+  const shootMatch = page3Text.match(/SHOOTINGS[\s\S]{0,300}/i);
   if (shootMatch) {
     const nums = [...shootMatch[0].matchAll(/(\d+)\s+[-\d.]+%/g)];
     console.log('MiamiDade shootings nums:', nums.map(m => m[1]).join(', '));
@@ -632,12 +658,11 @@ async function fetchMiamiDade() {
     if (nums.length >= 2) prior = parseInt(nums[1][1]);
   }
 
-  // Strategy 2: look for the header pattern "2026 ... 2025 ..." then find SHOOTINGS row
+  // Strategy 2: line-by-line scan
   if (ytd === null) {
     const lines = page3Text.split('\n').map(l => l.trim()).filter(Boolean);
     for (let i = 0; i < lines.length; i++) {
       if (/^SHOOTINGS$/i.test(lines[i])) {
-        // Next numeric lines are the values
         const vals = [];
         for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
           if (/^\d+$/.test(lines[j])) vals.push(parseInt(lines[j]));
