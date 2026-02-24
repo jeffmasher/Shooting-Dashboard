@@ -1043,194 +1043,153 @@ async function fetchPortland() {
   await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(12000);
 
-  // Log page text to confirm we're inside the viz
-  const bodyText = await page.evaluate(function() { return document.body.innerText; });
-  console.log('Portland embed text (first 400):', bodyText.substring(0, 400));
+  // Log full page text — the YTD comparison table is rendered directly in the viz
+  // Get asof from page before clearing filter
+  var bodyText0 = await page.evaluate(function() { return document.body.innerText; });
+  var asof = null;
+  var updatedMatch = bodyText0.match(/Updated:\s+(\d+)\/(\d+)\/(\d+)/);
+  if (updatedMatch) asof = updatedMatch[3] + '-' + updatedMatch[1].padStart(2,'0') + '-' + updatedMatch[2].padStart(2,'0');
+  console.log('Portland: asof from page:', asof);
 
-  // Click "Download Open Data" tab — use innerText match to avoid SVGAnimatedString crash
-  console.log('Portland: clicking Download Open Data tab via innerText...');
-  let tabClicked = false;
+  // Clear the "Filter Timeline by Date" filter so YTD comparison shows ALL months (not just January)
+  // The filter pill shows "(Multiple values)" — click "All Values in Database" checkbox via innerText
+  console.log('Portland: clearing date filter...');
   try {
     await page.evaluate(function() {
       var all = Array.from(document.querySelectorAll('*'));
       var el = all.find(function(e) {
-        var txt = (e.innerText || e.textContent || '').trim();
-        return txt === 'Download Open Data' || txt === 'Download Open Data';
+        return (e.innerText || e.textContent || '').trim() === 'All Values in Database';
       });
       if (el) el.click();
-      else throw new Error('Download Open Data tab not found in DOM');
+      else throw new Error('All Values checkbox not found');
     });
-    await page.waitForTimeout(5000);
-    console.log('Portland: tab clicked via innerText');
-    tabClicked = true;
+    await page.waitForTimeout(4000);
+    console.log('Portland: date filter cleared');
   } catch(e) {
-    console.log('Portland: innerText tab click failed:', e.message.split('\n')[0]);
-    // Fallback: Playwright text locator
-    const tabCandidates = [
-      'text=Download Open Data',
-      'li:has-text("Download Open Data")',
-      '[role="tab"]:has-text("Download")',
-      'text=Open Data',
-    ];
-    for (const sel of tabCandidates) {
-      try {
-        await forceClick(page.locator(sel).first(), 4000);
-        await page.waitForTimeout(4000);
-        console.log('Portland: tab clicked with selector:', sel);
-        tabClicked = true;
-        break;
-      } catch(e2) {
-        console.log('Portland: tab selector failed:', sel);
-      }
-    }
-  }
-
-  // Strategy 1: click "Click Here to Download Data" page link (on the Download Open Data sheet)
-  let csvText = null;
-  try {
-    const [ dl ] = await Promise.all([
-      page.waitForEvent('download', { timeout: 10000 }),
-      page.evaluate(function() {
-        var all = Array.from(document.querySelectorAll('a, button, [role="button"]'));
-        var el = all.find(function(e) {
-          var t = (e.innerText || e.textContent || '').trim().toLowerCase();
-          return t.includes('click here') || t.includes('download data') || t.includes('download the data');
-        });
-        if (el) { el.click(); return true; }
-        throw new Error('no page download link found');
-      })
-    ]);
-    const stream = await dl.createReadStream();
-    const chunks = [];
-    await new Promise(function(res, rej) { stream.on('data', function(c) { chunks.push(c); }); stream.on('end', res); stream.on('error', rej); });
-    const buf = Buffer.concat(chunks);
-    csvText = buf.toString('utf8').replace(/^\uFEFF/, '');
-    console.log('Portland: downloaded via page link | bytes:', buf.length);
-    console.log('Portland: CSV preview:', csvText.substring(0, 200));
-  } catch(e) {
-    console.log('Portland: page link download failed:', e.message.split('\n')[0]);
-  }
-
-  // Strategy 2: Tableau toolbar Download → Crosstab (same pattern as Milwaukee)
-  if (!csvText) {
+    console.log('Portland: could not clear filter:', e.message.split('\n')[0]);
+    // Try clicking the filter pill to open it first
     try {
-      console.log('Portland: trying toolbar Download → Crosstab...');
-      // Click the toolbar Download button
       await page.evaluate(function() {
-        var all = Array.from(document.querySelectorAll('button, [role="button"], a'));
+        var all = Array.from(document.querySelectorAll('*'));
         var el = all.find(function(e) {
-          var t = (e.innerText || e.textContent || '').trim();
-          return t === 'Download';
+          return (e.innerText || e.textContent || '').trim() === 'Filter Timeline by Date';
         });
         if (el) el.click();
-        else throw new Error('toolbar Download button not found');
       });
       await page.waitForTimeout(2000);
-
-      // Log what appeared in the download menu
-      const menuItems = await page.evaluate(function() {
-        return Array.from(document.querySelectorAll('[role="menuitem"], [class*="menu"] li, [class*="MenuItem"]'))
-          .map(function(e) { return (e.innerText || e.textContent || '').trim(); })
-          .filter(function(t) { return t.length > 1; });
-      });
-      console.log('Portland: download menu items:', JSON.stringify(menuItems));
-
-      // Click Crosstab
       await page.evaluate(function() {
-        var all = Array.from(document.querySelectorAll('[role="menuitem"], li, button, a'));
+        var all = Array.from(document.querySelectorAll('*'));
         var el = all.find(function(e) {
-          var t = (e.innerText || e.textContent || '').trim().toLowerCase();
-          return t === 'crosstab' || t.includes('crosstab');
+          return (e.innerText || e.textContent || '').trim() === 'All Values in Database';
         });
         if (el) el.click();
-        else throw new Error('Crosstab menu item not found');
       });
-      await page.waitForTimeout(2000);
-
-      // In Crosstab dialog: select CSV and download
-      const [ dl2 ] = await Promise.all([
-        page.waitForEvent('download', { timeout: 20000 }),
-        page.evaluate(function() {
-          // Try clicking CSV radio/option
-          var csvOpt = Array.from(document.querySelectorAll('input[type="radio"], label, button, [role="radio"]'))
-            .find(function(e) { return (e.innerText || e.textContent || e.value || '').trim().toLowerCase() === 'csv'; });
-          if (csvOpt) csvOpt.click();
-          // Then click Download button in dialog
-          var dlBtn = Array.from(document.querySelectorAll('button'))
-            .find(function(e) { return (e.innerText || e.textContent || '').trim().toLowerCase() === 'download'; });
-          if (dlBtn) { dlBtn.click(); return true; }
-          throw new Error('Download button in dialog not found');
-        })
-      ]);
-      const stream2 = await dl2.createReadStream();
-      const chunks2 = [];
-      await new Promise(function(res, rej) { stream2.on('data', function(c) { chunks2.push(c); }); stream2.on('end', res); stream2.on('error', rej); });
-      const buf2 = Buffer.concat(chunks2);
-      csvText = buf2.toString('utf8').replace(/^\uFEFF/, '');
-      if (!csvText.includes(',') && !csvText.includes('\t')) csvText = buf2.toString('utf16le').replace(/^\uFEFF/, '');
-      console.log('Portland: downloaded via toolbar Crosstab | bytes:', buf2.length);
-      console.log('Portland: CSV preview:', csvText.substring(0, 200));
-    } catch(e) {
-      console.log('Portland: toolbar Crosstab failed:', e.message.split('\n')[0]);
+      await page.waitForTimeout(4000);
+      console.log('Portland: date filter cleared via pill open');
+    } catch(e2) {
+      console.log('Portland: filter clear fallback also failed:', e2.message.split('\n')[0]);
     }
   }
 
-  // Diagnostic: if still no CSV log page state
-  if (!csvText) {
-    const pageState = await page.evaluate(function() {
-      return {
-        text: document.body.innerText.substring(0, 600),
-        links: Array.from(document.querySelectorAll('a, button')).map(function(e) {
-          return (e.innerText || e.textContent || '').trim().substring(0, 50);
-        }).filter(function(t) { return t.length > 2; }).slice(0, 30)
-      };
+  // Set Shooting Type filter: deselect "No Injury" so chart shows Homicide + Non-Fatal Injury only
+  console.log('Portland: opening Shooting Type filter...');
+  try {
+    // Click the shooting type filter label/dropdown to open it
+    await page.evaluate(function() {
+      var all = Array.from(document.querySelectorAll('*'));
+      var el = all.find(function(e) {
+        return (e.innerText || e.textContent || '').trim() === 'Filter All Charts by Shooting Type';
+      });
+      if (el) el.click();
+      else throw new Error('Shooting Type filter label not found');
     });
-    console.log('Portland: page text after tab click:', pageState.text);
-    console.log('Portland: buttons/links:', JSON.stringify(pageState.links));
+    await page.waitForTimeout(2000);
+
+    // Deselect "No Injury"
+    await page.evaluate(function() {
+      var all = Array.from(document.querySelectorAll('*'));
+      var el = all.find(function(e) {
+        return (e.innerText || e.textContent || '').trim() === 'No Injury';
+      });
+      if (el) el.click();
+      else throw new Error('No Injury option not found');
+    });
+    await page.waitForTimeout(4000);
+    console.log('Portland: No Injury deselected');
+  } catch(e) {
+    console.log('Portland: shooting type filter failed:', e.message.split('\n')[0]);
+    // Log visible filter options for diagnosis
+    const filterOpts = await page.evaluate(function() {
+      return Array.from(document.querySelectorAll('*'))
+        .map(function(e) { return (e.innerText || e.textContent || '').trim(); })
+        .filter(function(t) { return t === 'No Injury' || t === 'Homicide' || t === 'Non-Fatal Injury'; })
+        .slice(0, 10);
+    });
+    console.log('Portland: visible shooting type options:', JSON.stringify(filterOpts));
   }
 
+  const bodyText = await page.evaluate(function() { return document.body.innerText; });
   await browser.close();
 
-  if (!csvText) throw new Error('Portland: could not download CSV — check tab/link selectors in logs');
-
-  // Parse CSV
-  const lines = csvText.split('\n').map(function(l) { return l.replace(/\r/g,'').trim(); }).filter(Boolean);
-  const headers = lines[0].split(',').map(function(h) { return h.replace(/"/g,'').trim(); });
-  console.log('Portland: headers:', headers);
-
-  var yearCol = headers.indexOf('Occur Year');
-  var typeCol = headers.indexOf('Shooting Type');
-  var dateCol = headers.indexOf('Occurence Date');
-
-  if (yearCol < 0) {
-    var hdrTab = lines[0].split('\t').map(function(h) { return h.replace(/"/g,'').trim(); });
-    yearCol = hdrTab.indexOf('Occur Year');
-    typeCol = hdrTab.indexOf('Shooting Type');
-    dateCol = hdrTab.indexOf('Occurence Date');
-    if (yearCol >= 0) {
-      return parseAndBuild(lines, '\t', yearCol, typeCol, dateCol, yr);
-    }
-    throw new Error('Portland: columns not found. Headers: ' + lines[0].substring(0,200));
+  // Log the YTD comparison block specifically
+  var allLines = bodyText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+  var ytdBlockIdx = allLines.findIndex(function(l) { return l.startsWith('Year-to-Date Comparis'); });
+  console.log('Portland: YTD block at line', ytdBlockIdx, '| total lines:', allLines.length);
+  if (ytdBlockIdx >= 0) {
+    console.log('Portland: YTD block (40 lines):', JSON.stringify(allLines.slice(ytdBlockIdx, ytdBlockIdx + 40)));
   }
 
-  return parseAndBuild(lines, ',', yearCol, typeCol, dateCol, yr);
+  // Parse: after "Year-to-Date Comparison: ..." we get year labels then count values in pairs
+  // Structure (each on its own line):
+  //   Year-to-Date Comparison: [month or "All"]
+  //   2019
+  //   2020
+  //   ...
+  //   2026
+  //   [count for 2019]
+  //   [count for 2020]
+  //   ...
+  //   [count for 2026]
+  var ytd = null, prior = null;
 
-  function parseAndBuild(lines, sep, yearCol, typeCol, dateCol, yr) {
-    var ytd = 0, prior = 0, maxDate = null;
-    for (var i = 1; i < lines.length; i++) {
-      var cols = lines[i].split(sep).map(function(c) { return c.replace(/"/g,'').trim(); });
-      var t = cols[typeCol];
-      if (t !== 'Homicide' && t !== 'Non-Fatal Injury') continue;
-      if (cols[yearCol] === String(yr))     { ytd++;   if (dateCol >= 0 && cols[dateCol] > (maxDate||'')) maxDate = cols[dateCol]; }
-      if (cols[yearCol] === String(yr - 1)) prior++;
+  if (ytdBlockIdx >= 0) {
+    // Collect contiguous 4-digit year lines immediately after the header
+    var years = [];
+    var i = ytdBlockIdx + 1;
+    while (i < allLines.length && /^\d{4}$/.test(allLines[i])) {
+      years.push(allLines[i]);
+      i++;
     }
-    console.log('Portland final: ytd=' + ytd + ' prior=' + prior + ' maxDate=' + maxDate);
-    if (ytd === 0 && prior === 0) throw new Error('Portland: parsed all zeros');
-    var asof = yr + '-12-31';
-    if (maxDate) {
-      var p = maxDate.split('/');
-      if (p.length === 3) asof = p[2] + '-' + p[0].padStart(2,'0') + '-' + p[1].padStart(2,'0');
+    console.log('Portland: years found:', years);
+
+    // Now collect the same number of numeric count values
+    var counts = [];
+    while (i < allLines.length && counts.length < years.length) {
+      var n = parseInt(allLines[i].replace(/,/g, ''), 10);
+      if (!isNaN(n) && n >= 0) counts.push(n);
+      else if (allLines[i] !== '' && !/^\d{4}$/.test(allLines[i])) {
+        // Non-numeric non-year line means we've left the data block
+        break;
+      }
+      i++;
     }
-    return { ytd: ytd, prior: prior, asof: asof };
+    console.log('Portland: counts found:', counts);
+
+    if (years.length === counts.length && years.length > 0) {
+      var yrIdx    = years.indexOf(String(yr));
+      var priorIdx = years.indexOf(String(yr - 1));
+      if (yrIdx >= 0)    ytd   = counts[yrIdx];
+      if (priorIdx >= 0) prior = counts[priorIdx];
+    }
   }
+
+  console.log('Portland final: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
+
+  if (ytd === null || prior === null) {
+    console.log('Portland: full page text for diagnosis:\n' + bodyText.substring(0, 3000));
+    throw new Error('Portland: could not parse YTD totals from page text');
+  }
+  if (ytd === 0 && prior === 0) throw new Error('Portland: parsed all zeros');
+
+  return { ytd: ytd, prior: prior, asof: asof };
 }
