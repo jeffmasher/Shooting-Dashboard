@@ -10,61 +10,61 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "durham": {
     "ytd": 16,
     "prior": 20,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 46,
     "prior": 56,
     "asof": "2026-02-23",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "memphis": {
     "ytd": 70,
     "prior": 94,
     "asof": "2026-02-23",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
     "asof": "2025-01-31",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "miamidade": {
     "ytd": 15,
     "prior": 26,
-    "asof": null,
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "asof": "2026-02-20",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 12,
     "asof": "2026-02-24",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   },
   "portland": {
     "ok": false,
-    "error": "Portland: could not parse YTD totals from page text",
-    "fetchedAt": "2026-02-24T22:46:24.181Z"
+    "error": "Cannot find module '@anthropic-ai/sdk'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
+    "fetchedAt": "2026-02-24T22:51:53.263Z"
   },
   "buffalo": {
     "ytd": 39,
     "prior": 48,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-02-24T22:46:24.181Z",
+    "fetchedAt": "2026-02-24T22:51:53.263Z",
     "ok": true
   }
 }
