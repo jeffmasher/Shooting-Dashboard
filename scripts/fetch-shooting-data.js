@@ -582,138 +582,182 @@ async function fetchBuffalo() {
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: true });
   const page    = await browser.newPage();
-  await page.setViewportSize({ width: 1536, height: 900 });
+  await page.setViewportSize({ width: 1536, height: 1024 });
   page.setDefaultTimeout(30000);
 
+  const yr = new Date().getFullYear();
+
+  // Step 1: Load dashboard
   const url = 'https://mypublicdashboard.ny.gov/t/OJRP_PUBLIC/views/GIVEInitiative/GIVE-LandingPage';
   console.log('Buffalo: loading GIVE dashboard...');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(10000);
 
-  // Click the "GIVE-Shooting Activity" tab
+  // Step 2: Click GIVE-Shooting Activity tab
   console.log('Buffalo: clicking Shooting Activity tab...');
   try {
     await page.locator('text=GIVE-Shooting Activity').first().click({ timeout: 10000 });
     await page.waitForTimeout(8000);
+    console.log('Buffalo: on Shooting Activity tab');
   } catch(e) {
-    // Try partial match
-    try {
-      await page.locator('[data-tb-test-id*="Shooting"]').first().click({ timeout: 5000 });
-      await page.waitForTimeout(8000);
-    } catch(e2) {
-      console.log('Buffalo: tab click failed, trying to proceed:', e.message);
-    }
+    console.log('Buffalo: tab click failed:', e.message);
+  }
+
+  // Step 3: Open Jurisdiction dropdown (second filter on page)
+  // Page structure: Filter/County/(All) then Filter/Jurisdiction/(All)
+  console.log('Buffalo: opening Jurisdiction dropdown...');
+  try {
+    const allEls = page.locator('text=(All)');
+    const count = await allEls.count();
+    console.log('Buffalo: (All) elements found:', count);
+    // Jurisdiction is the second (All)
+    await allEls.nth(count >= 2 ? 1 : 0).click({ timeout: 8000 });
+    await page.waitForTimeout(3000);
+    console.log('Buffalo: jurisdiction dropdown opened');
+  } catch(e) {
+    console.log('Buffalo: jurisdiction dropdown open failed:', e.message);
+  }
+
+  // Step 4: Click (All) inside the dropdown to deselect all
+  console.log('Buffalo: deselecting all jurisdictions...');
+  try {
+    // After dropdown opens, (All) appears as a selectable option inside it
+    const allEls = page.locator('text=(All)');
+    const count = await allEls.count();
+    console.log('Buffalo: (All) elements after dropdown open:', count);
+    // The new (All) inside the dropdown should be last or there may be more now
+    await allEls.last().click({ timeout: 5000 });
+    await page.waitForTimeout(2000);
+    console.log('Buffalo: clicked (All) to deselect');
+  } catch(e) {
+    console.log('Buffalo: deselect all failed:', e.message);
+  }
+
+  // Step 5: Select Buffalo City PD
+  console.log('Buffalo: selecting Buffalo City PD...');
+  try {
+    await page.locator('text=Buffalo City PD').first().click({ timeout: 8000 });
+    await page.waitForTimeout(2000);
+    console.log('Buffalo: clicked Buffalo City PD');
+  } catch(e) {
+    console.log('Buffalo: Buffalo City PD click failed:', e.message);
+    const opts = await page.evaluate(() => document.body.innerText);
+    console.log('Buffalo: page text after dropdown open:', opts.substring(0, 800));
+  }
+
+  // Step 6: Click Apply
+  console.log('Buffalo: clicking Apply...');
+  try {
+    await page.locator('text=Apply').first().click({ timeout: 8000 });
+    await page.waitForTimeout(6000);
+    console.log('Buffalo: applied filter');
+  } catch(e) {
+    console.log('Buffalo: Apply click failed:', e.message);
   }
 
   let pageText = await page.evaluate(() => document.body.innerText);
-  console.log('Buffalo post-tab sample:', pageText.substring(0, 400));
+  console.log('Buffalo post-filter page text:', pageText.substring(0, 600));
 
-  // Select "Buffalo City PD" jurisdiction filter
-  console.log('Buffalo: selecting Buffalo City PD jurisdiction...');
+  // Step 7: Click Monthly Data toggle
+  console.log('Buffalo: clicking Monthly Data...');
   try {
-    // Look for a dropdown or filter containing jurisdiction options
-    await page.locator('text=Buffalo City PD').first().click({ timeout: 10000 });
-    await page.waitForTimeout(5000);
+    await page.locator('text=Monthly Data').first().click({ timeout: 8000 });
+    await page.waitForTimeout(8000);
+    console.log('Buffalo: switched to Monthly Data');
   } catch(e) {
-    // Try clicking a jurisdiction dropdown first
-    try {
-      const dropdowns = page.locator('[role="combobox"], select, [class*="filter"], [class*="dropdown"]');
-      const count = await dropdowns.count();
-      console.log('Buffalo: found', count, 'potential dropdowns');
-      // Try clicking each to find jurisdiction
-      for (let i = 0; i < Math.min(count, 5); i++) {
-        try {
-          await dropdowns.nth(i).click({ timeout: 3000 });
-          await page.waitForTimeout(1000);
-          const hasBuffalo = await page.locator('text=Buffalo City PD').count();
-          if (hasBuffalo > 0) {
-            await page.locator('text=Buffalo City PD').first().click({ timeout: 3000 });
-            await page.waitForTimeout(5000);
-            console.log('Buffalo: selected jurisdiction via dropdown', i);
-            break;
-          }
-        } catch(e2) { /* try next */ }
-      }
-    } catch(e2) {
-      console.log('Buffalo: jurisdiction selection failed:', e.message);
-    }
+    console.log('Buffalo: Monthly Data click failed:', e.message);
   }
 
   pageText = await page.evaluate(() => document.body.innerText);
-  console.log('Buffalo post-filter sample:', pageText.substring(0, 1000));
+  console.log('Buffalo final page text:', pageText.substring(0, 3000));
 
-  // Take screenshot for vision fallback
-  const screenshotBuf = await page.screenshot({ fullPage: false });
+  // Step 8: Screenshot and parse with vision
+  const screenshotBuf = await page.screenshot({ fullPage: true });
   await browser.close();
   console.log('Buffalo: screenshot taken, size:', screenshotBuf.length, 'bytes');
 
-  const yr = new Date().getFullYear();
+  // Try text parsing first before using vision
+  // After Monthly Data, page should show month-by-month rows
+  // Look for Jan values for current and prior year
+  let ytd = null, prior = null;
 
-  // Try text parsing first: sum "Shooting Victims (Persons Hit)" + "Individuals Killed by Gun Violence"
-  // for current year months, compare to prior year
-  let ytd = null, prior = null, asof = null;
+  // Pattern: lines like "Jan-26\n<number>" or values in a table
+  // Try to extract directly from page text
+  const lines = pageText.split('\n').map(l => l.trim()).filter(Boolean);
+  console.log('Buffalo line count:', lines.length);
 
-  // Look for monthly data patterns in page text
-  // The data appears as month rows with counts
-  const victimsMatch = pageText.match(/Shooting Victims.*?Persons Hit[\s\S]{0,2000}/i);
-  const killedMatch  = pageText.match(/Individuals Killed.*?Gun Violence[\s\S]{0,2000}/i);
-  console.log('Buffalo victims section found:', !!victimsMatch);
-  console.log('Buffalo killed section found:', !!killedMatch);
+  // Find "Shooting Victims (Persons Hit)" and "Individuals Killed By Gun Violence" sections
+  // and sum their January values for current and prior year
+  let victimsYtd = null, victimsPrior = null;
+  let killedYtd = null, killedPrior = null;
 
-  // Strategy: use vision API to read the numbers from the screenshot
+  const janCurr = `Jan-${String(yr).slice(2)}`; // e.g. "Jan-26"
+  const janPrior = `Jan-${String(yr-1).slice(2)}`; // e.g. "Jan-25"
+  console.log('Buffalo: looking for', janCurr, 'and', janPrior);
+
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i] === janCurr && i + 1 < lines.length && /^\d+$/.test(lines[i+1])) {
+      const val = parseInt(lines[i+1]);
+      if (victimsYtd === null) victimsYtd = val;
+      else if (killedYtd === null) killedYtd = val;
+    }
+    if (lines[i] === janPrior && i + 1 < lines.length && /^\d+$/.test(lines[i+1])) {
+      const val = parseInt(lines[i+1]);
+      if (victimsPrior === null) victimsPrior = val;
+      else if (killedPrior === null) killedPrior = val;
+    }
+  }
+  console.log(`Buffalo text parse: victimsYtd=${victimsYtd} killedYtd=${killedYtd} victimsPrior=${victimsPrior} killedPrior=${killedPrior}`);
+
+  if (victimsYtd !== null && killedYtd !== null) {
+    ytd   = victimsYtd + killedYtd;
+    prior = (victimsPrior !== null && killedPrior !== null) ? victimsPrior + killedPrior : null;
+    console.log('Buffalo: parsed from text, ytd=' + ytd + ' prior=' + prior);
+    return { ytd, prior, asof: `${yr}-01-31` };
+  }
+
+  // Fallback: vision API
+  console.log('Buffalo: falling back to vision API...');
   const base64Image = screenshotBuf.toString('base64');
   const claudeData = await new Promise((resolve, reject) => {
     const body = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 512,
+      max_tokens: 256,
       messages: [{
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
-          { type: 'text', text: `This is a NY GIVE shooting dashboard filtered to Buffalo City PD. I need the sum of "Shooting Victims (Persons Hit)" + "Individuals Killed by Gun Violence" for January ${yr} (YTD ${yr}) and January ${yr-1} (YTD ${yr-1}). Add those two metrics together for each year. Reply with ONLY: YTD${yr}=N YTD${yr-1}=N ASOF=YYYY-MM-DD (use the last date of available data, or ${yr}-01-31 if January is the latest month shown)` }
+          { type: 'text', text: `NY GIVE dashboard, Buffalo City PD, Monthly Data view. Find January ${yr}: sum "Shooting Victims (Persons Hit)" + "Individuals Killed by Gun Violence". Do the same for January ${yr-1}. Reply ONLY: YTD${yr}=N YTD${yr-1}=N` }
         ]
       }]
     });
     const req = require('https').request({
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(body)
-      }
+      hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(body) }
     }, (res) => {
       const chunks = [];
       res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-        catch(e) { reject(e); }
-      });
+      res.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString())); } catch(e) { reject(e); } });
     });
     req.on('error', reject);
-    req.write(body);
-    req.end();
+    req.write(body); req.end();
   });
 
   const responseText = claudeData.content?.[0]?.text || '';
   console.log('Buffalo vision response:', responseText);
 
-  const mYtd   = responseText.match(new RegExp(`YTD${yr}=(\\d+)`));
-  const mPrior = responseText.match(new RegExp(`YTD${yr-1}=(\\d+)`));
-  const mAsof  = responseText.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
+  const mYtd   = responseText.match(new RegExp('YTD' + yr + '=(\\d+)'));
+  const mPrior = responseText.match(new RegExp('YTD' + (yr-1) + '=(\\d+)'));
 
-  if (!mYtd) throw new Error('Could not parse Buffalo YTD from vision API. Response: ' + responseText);
+  if (!mYtd) throw new Error('Could not parse Buffalo YTD. Response: ' + responseText);
 
   return {
     ytd:   parseInt(mYtd[1]),
     prior: mPrior ? parseInt(mPrior[1]) : null,
-    asof:  mAsof ? mAsof[1] : `${yr}-01-31`
+    asof:  `${yr}-01-31`
   };
 }
-
-
 
 
 async function fetchMiamiDade() {
