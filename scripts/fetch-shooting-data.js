@@ -587,10 +587,8 @@ async function fetchBuffalo() {
 
   const yr = new Date().getFullYear();
 
-  // Tableau has a transparent glass overlay (tab-glass) that intercepts pointer events.
-  // Use force:true on all clicks to bypass it.
-  async function forceClick(locator, timeout = 8000) {
-    await locator.click({ force: true, timeout });
+  async function forceClick(locator, timeout) {
+    await locator.click({ force: true, timeout: timeout || 8000 });
   }
 
   // Step 1: Load dashboard
@@ -653,7 +651,6 @@ async function fetchBuffalo() {
   } catch(e) { console.log('Buffalo: Monthly Data click failed:', e.message); }
 
   // Step 8: Click Download toolbar button
-  // data-tb-test-id="viz-viewer-toolbar-button-download" was visible in prior logs
   console.log('Buffalo: clicking Download toolbar button...');
   try {
     await forceClick(page.locator('[data-tb-test-id="viz-viewer-toolbar-button-download"]').first());
@@ -661,7 +658,7 @@ async function fetchBuffalo() {
     console.log('Buffalo: download menu opened');
   } catch(e) { console.log('Buffalo: download button failed:', e.message); }
 
-  // Step 9: Click Crosstab in dropdown menu
+  // Step 9: Click Crosstab
   console.log('Buffalo: clicking Crosstab...');
   try {
     await forceClick(page.locator('text=Crosstab').first());
@@ -677,7 +674,7 @@ async function fetchBuffalo() {
     console.log('Buffalo: selected Monthly Total Overview');
   } catch(e) { console.log('Buffalo: sheet selection failed:', e.message); }
 
-  // Step 11: Select CSV radio button
+  // Step 11: Select CSV
   console.log('Buffalo: selecting CSV...');
   try {
     await forceClick(page.locator('text=CSV').first(), 5000);
@@ -685,7 +682,7 @@ async function fetchBuffalo() {
     console.log('Buffalo: CSV selected');
   } catch(e) { console.log('Buffalo: CSV select failed:', e.message); }
 
-  // Step 12: Click Download button and capture file
+  // Step 12: Download and capture file
   console.log('Buffalo: clicking Download button...');
   let csvText = null;
   try {
@@ -700,9 +697,11 @@ async function fetchBuffalo() {
       stream.on('end', res);
       stream.on('error', rej);
     });
-    csvText = Buffer.concat(chunks).toString('utf8');
-    console.log('Buffalo: CSV downloaded, length:', csvText.length);
-    console.log('Buffalo: CSV preview:\n', csvText.substring(0, 800));
+    // File is UTF-16 LE with BOM, tab-delimited, long format
+    const buf = Buffer.concat(chunks);
+    csvText = buf.toString('utf16le').replace(/^\uFEFF/, '');
+    console.log('Buffalo: CSV downloaded, bytes:', buf.length);
+    console.log('Buffalo: CSV preview:', csvText.substring(0, 200));
   } catch(e) {
     console.log('Buffalo: CSV download failed:', e.message);
   }
@@ -711,69 +710,55 @@ async function fetchBuffalo() {
 
   if (!csvText) throw new Error('Buffalo: could not download CSV');
 
-  // Parse CSV
-  // Expected layout from Tableau crosstab: rows are metrics, columns include months
-  // OR: rows are months, columns are metrics — log will tell us
-  const rows = csvText.split('\n').map(l => l.trim()).filter(Boolean);
-  console.log('Buffalo CSV row 0 (headers):', rows[0]);
-  console.log('Buffalo CSV row 1:', rows[1]);
-  console.log('Buffalo CSV row 2:', rows[2]);
-
-  const janCurr  = `Jan-${String(yr).slice(2)}`;
-  const janPrior = `Jan-${String(yr - 1).slice(2)}`;
-
-  // Parse header row to find column indices for janCurr and janPrior
-  const parseCSVRow = (line) => {
-    const result = [];
-    let cur = '', inQ = false;
-    for (const ch of line) {
-      if (ch === '"') { inQ = !inQ; }
-      else if (ch === ',' && !inQ) { result.push(cur.trim()); cur = ''; }
-      else { cur += ch; }
-    }
-    result.push(cur.trim());
-    return result;
-  };
-
-  const headers = parseCSVRow(rows[0]);
-  console.log('Buffalo CSV headers:', headers);
-
-  const janCurrCol  = headers.findIndex(h => h.includes(janCurr));
-  const janPriorCol = headers.findIndex(h => h.includes(janPrior));
-  console.log(`Buffalo: janCurr col=${janCurrCol} janPrior col=${janPriorCol}`);
+  // Format: tab-delimited, long format
+  // Columns: Month | Shooting Category | Count
+  // Each row is duplicated — take first occurrence only
+  const janCurr  = 'Jan-' + String(yr).slice(2);
+  const janPrior = 'Jan-' + String(yr - 1).slice(2);
 
   let victimsYtd = null, victimsPrior = null;
   let killedYtd  = null, killedPrior  = null;
 
-  for (let i = 1; i < rows.length; i++) {
-    const cols = parseCSVRow(rows[i]);
-    const rowLabel = cols[0].toLowerCase();
-    const isVictims = rowLabel.includes('shooting victims') || rowLabel.includes('persons hit');
-    const isKilled  = rowLabel.includes('individuals killed') || rowLabel.includes('gun violence');
+  const rows = csvText.split('\n').map(function(l) { return l.replace(/\r/g, '').trim(); }).filter(Boolean);
+  console.log('Buffalo: total rows:', rows.length, '| janCurr:', janCurr, '| janPrior:', janPrior);
+
+  for (var i = 1; i < rows.length; i++) {
+    var cols = rows[i].split('\t');
+    if (cols.length < 3) continue;
+    var month    = cols[0].trim();
+    var category = cols[1].trim().toLowerCase();
+    var count    = parseInt(cols[2].trim().replace(/,/g, ''));
+    if (isNaN(count)) continue;
+
+    var isVictims = category.indexOf('shooting victims') >= 0 || category.indexOf('persons hit') >= 0;
+    var isKilled  = category.indexOf('individuals killed') >= 0 || category.indexOf('gun violence') >= 0;
     if (!isVictims && !isKilled) continue;
 
-    const getVal = (colIdx) => {
-      if (colIdx < 0 || colIdx >= cols.length) return null;
-      const v = parseInt(cols[colIdx].replace(/,/g, ''));
-      return isNaN(v) ? null : v;
-    };
-
-    if (isVictims) { victimsYtd = getVal(janCurrCol); victimsPrior = getVal(janPriorCol); }
-    if (isKilled)  { killedYtd  = getVal(janCurrCol); killedPrior  = getVal(janPriorCol); }
+    if (month === janCurr) {
+      if (isVictims && victimsYtd === null)  victimsYtd = count;
+      if (isKilled  && killedYtd  === null)  killedYtd  = count;
+    }
+    if (month === janPrior) {
+      if (isVictims && victimsPrior === null) victimsPrior = count;
+      if (isKilled  && killedPrior  === null) killedPrior  = count;
+    }
   }
 
-  console.log(`Buffalo parsed: victimsYtd=${victimsYtd} killedYtd=${killedYtd} victimsPrior=${victimsPrior} killedPrior=${killedPrior}`);
+  console.log('Buffalo parsed: victimsYtd=' + victimsYtd + ' killedYtd=' + killedYtd + ' victimsPrior=' + victimsPrior + ' killedPrior=' + killedPrior);
 
   if (victimsYtd === null || killedYtd === null) {
-    throw new Error(`Buffalo: could not find Jan values in CSV. Headers: ${headers.join('|')}`);
+    var months = rows.slice(1).map(function(r) { return r.split('\t')[0]; });
+    var unique = months.filter(function(v, i, a) { return a.indexOf(v) === i; });
+    throw new Error('Buffalo: could not find ' + janCurr + ' values. Last months: ' + unique.slice(-6).join(', '));
   }
 
   return {
     ytd:   victimsYtd + killedYtd,
     prior: (victimsPrior !== null && killedPrior !== null) ? victimsPrior + killedPrior : null,
-    asof:  `${yr}-01-31`
+    asof:  yr + '-01-31'
   };
 }
+
 
 
 async function fetchMiamiDade() {
