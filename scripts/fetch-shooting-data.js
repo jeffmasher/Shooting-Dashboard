@@ -1045,7 +1045,7 @@ async function fetchPortland() {
   const yr = new Date().getFullYear();
 
   const embedUrl = 'https://public.tableau.com/views/PortlandShootingIncidentStatistics/ShootingIncidentStatistics?:showVizHome=no&:embed=true&:toolbar=yes';
-  console.log('Portland: loading viz embed...');
+  console.log('Portland: loading viz embed with shooting type filter...');
   await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(12000);
 
@@ -1089,32 +1089,96 @@ async function fetchPortland() {
   }
 
   // Step 2: Deselect "No Injury" from shooting type filter
-  // Filter label is "Filter All Charts by Shooting Type" — click it to open, then deselect No Injury
+  // Strategy: find the "All" select/dropdown element that's a sibling/child near "Shooting Type" text,
+  // click it to open, then find and deselect "No Injury"
   console.log('Portland: opening Shooting Type filter...');
+  let filterOpened = false;
+
+  // Try 1: find element with exact text "All" that is closest to "Filter All Charts by Shooting Type"
   try {
     await page.evaluate(function() {
-      var all = Array.from(document.querySelectorAll('*'));
-      var el = all.find(function(e) { return (e.innerText || e.textContent || '').trim() === 'Filter All Charts by Shooting Type'; });
-      if (el) el.click(); else throw new Error('label not found');
+      var allEls = Array.from(document.querySelectorAll('*'));
+      // Find the label element
+      var label = allEls.find(function(e) {
+        return (e.innerText || e.textContent || '').trim() === 'Filter All Charts by Shooting Type';
+      });
+      if (!label) throw new Error('label not found');
+      // Walk up to find a common ancestor that also contains "All", then click "All"
+      var ancestor = label;
+      for (var i = 0; i < 8; i++) {
+        ancestor = ancestor.parentElement;
+        if (!ancestor) break;
+        var allChild = Array.from(ancestor.querySelectorAll('*')).find(function(e) {
+          return (e.innerText || e.textContent || '').trim() === 'All' && e !== label;
+        });
+        if (allChild) { allChild.click(); return; }
+      }
+      throw new Error('All dropdown not found near label');
     });
     await page.waitForTimeout(2000);
-    await page.evaluate(function() {
-      var all = Array.from(document.querySelectorAll('*'));
-      var el = all.find(function(e) { return (e.innerText || e.textContent || '').trim() === 'No Injury'; });
-      if (el) el.click(); else throw new Error('No Injury not found');
-    });
-    await page.waitForTimeout(4000);
-    console.log('Portland: No Injury deselected');
-  } catch(e) {
-    console.log('Portland: shooting type filter failed:', e.message.split('\n')[0]);
-    // Log what's visible for diagnosis
-    const opts = await page.evaluate(function() {
+    // Take diagnostic screenshot of open filter
+    const diagBuf = await page.screenshot({ fullPage: false });
+    console.log('Portland: filter open diagnostic screenshot, size:', diagBuf.length);
+    // Check what's now visible
+    const afterOpen = await page.evaluate(function() {
       return Array.from(document.querySelectorAll('*'))
         .map(function(e) { return (e.innerText || e.textContent || '').trim(); })
-        .filter(function(t) { return t === 'No Injury' || t === 'Homicide' || t === 'Non-Fatal Injury' || t === 'All'; })
+        .filter(function(t) { return t === 'No Injury' || t === 'Homicide' || t === 'Non-Fatal Injury'; })
         .slice(0, 10);
     });
-    console.log('Portland: visible filter options:', JSON.stringify(opts));
+    console.log('Portland: filter options after open:', JSON.stringify(afterOpen));
+    if (afterOpen.length > 0) {
+      await page.evaluate(function() {
+        var allEls = Array.from(document.querySelectorAll('*'));
+        var el = allEls.find(function(e) { return (e.innerText || e.textContent || '').trim() === 'No Injury'; });
+        if (el) el.click(); else throw new Error('No Injury not found after open');
+      });
+      await page.waitForTimeout(4000);
+      filterOpened = true;
+      console.log('Portland: No Injury deselected via Try 1');
+    }
+  } catch(e) {
+    console.log('Portland: Try 1 failed:', e.message.split('\n')[0]);
+  }
+
+  // Try 2: use Playwright locator to find select element near shooting type text
+  if (!filterOpened) {
+    try {
+      // Look for a <select> or role=listbox near the filter label
+      const filterArea = page.locator('text=Filter All Charts by Shooting Type');
+      const parent = filterArea.locator('..');
+      await parent.locator('select, [role=listbox], [role=combobox]').first().click({ timeout: 3000 });
+      await page.waitForTimeout(2000);
+      const afterOpen2 = await page.evaluate(function() {
+        return Array.from(document.querySelectorAll('*'))
+          .map(function(e) { return (e.innerText || e.textContent || '').trim(); })
+          .filter(function(t) { return t === 'No Injury' || t === 'Homicide' || t === 'Non-Fatal Injury'; })
+          .slice(0, 10);
+      });
+      console.log('Portland: Try 2 filter options:', JSON.stringify(afterOpen2));
+      if (afterOpen2.length > 0) {
+        await page.locator('text=No Injury').first().click();
+        await page.waitForTimeout(4000);
+        filterOpened = true;
+        console.log('Portland: No Injury deselected via Try 2');
+      }
+    } catch(e) {
+      console.log('Portland: Try 2 failed:', e.message.split('\n')[0]);
+    }
+  }
+
+  if (!filterOpened) {
+    console.log('Portland: WARNING - could not deselect No Injury, screenshot will include all shooting types');
+    // Log full DOM text snippet around shooting type for diagnosis
+    const diagText = await page.evaluate(function() {
+      var all = Array.from(document.querySelectorAll('*'));
+      var label = all.find(function(e) { return (e.innerText || e.textContent || '').trim() === 'Filter All Charts by Shooting Type'; });
+      if (!label) return 'label not found';
+      var ancestor = label;
+      for (var i = 0; i < 5; i++) { ancestor = ancestor.parentElement; if (!ancestor) break; }
+      return ancestor ? ancestor.innerHTML.substring(0, 500) : 'no ancestor';
+    });
+    console.log('Portland: Shooting Type filter DOM snippet:', diagText);
   }
 
   // Step 3: Screenshot the YTD Comparison bar chart and send to vision API
@@ -1123,7 +1187,7 @@ async function fetchPortland() {
   console.log('Portland: screenshot taken, size:', screenshotBuf.length, 'bytes');
 
   const base64Image = screenshotBuf.toString('base64');
-  const promptText = 'This is a Portland Police Bureau Tableau dashboard showing shooting incident statistics. Find the "Year-to-Date Comparison" bar chart. It shows yearly totals excluding No Injury shootings (Homicide + Non-Fatal Injury only). Extract the YTD total for ' + yr + ' and for ' + (yr-1) + '. Reply ONLY in this exact format: YTD' + yr + '=N YTD' + (yr-1) + '=N';
+  const promptText = 'This is a Portland Police Bureau Tableau dashboard filtered to show only Homicide and Non-Fatal Injury shooting incidents (No Injury excluded). Find the "Year-to-Date Comparison" bar chart and extract the yearly totals for ' + yr + ' and ' + (yr-1) + '. Reply ONLY in this exact format with no other text: YTD' + yr + '=N YTD' + (yr-1) + '=N';
 
   const claudeData = await new Promise((resolve, reject) => {
     const body = JSON.stringify({
