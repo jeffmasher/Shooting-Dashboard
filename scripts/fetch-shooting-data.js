@@ -1049,6 +1049,17 @@ async function main() {
     results.pittsburgh = { ok: false, error: e.message, fetchedAt };
   }
 
+  // Portland
+  try {
+    console.log('\n--- Fetching Portland ---');
+    const portTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error('Portland timed out after 120s')), 120000));
+    results.portland = { ...(await Promise.race([fetchPortland(), portTimeout])), fetchedAt, ok: true };
+    console.log('Portland:', results.portland);
+  } catch (e) {
+    console.error('Portland error:', e.message);
+    results.portland = { ok: false, error: e.message, fetchedAt };
+  }
+
   // Buffalo
   try {
     console.log('\n--- Fetching Buffalo ---');
@@ -1068,3 +1079,131 @@ async function main() {
 }
 
 main().catch(e => { console.error(e); process.exit(1); });
+
+// ─── Portland (Tableau - PPB Shooting Incident Statistics) ───────────────────
+// Downloads raw incident CSV from "Download Open Data" tab, filters to
+// Homicide + Non-Fatal Injury, counts by year for ytd vs prior.
+
+async function fetchPortland() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  page.setDefaultTimeout(30000);
+
+  const yr = new Date().getFullYear();
+
+  async function forceClick(locator, timeout) {
+    await locator.click({ force: true, timeout: timeout || 10000 });
+  }
+
+  console.log('Portland: loading Tableau dashboard...');
+  await page.goto('https://public.tableau.com/views/PortlandShootingIncidentStatistics/ShootingIncidentStatistics', {
+    waitUntil: 'domcontentloaded', timeout: 60000
+  });
+  await page.waitForTimeout(10000);
+
+  // Navigate to "Download Open Data" tab
+  console.log('Portland: clicking Download Open Data tab...');
+  try {
+    await forceClick(page.locator('text=Download Open Data').first());
+    await page.waitForTimeout(5000);
+    console.log('Portland: on Download Open Data tab');
+  } catch(e) {
+    console.log('Portland: tab click failed:', e.message);
+  }
+
+  // Click "Click Here to Download Data"
+  console.log('Portland: clicking download link...');
+  let csvText = null;
+  try {
+    const [ download ] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30000 }),
+      forceClick(page.locator('text=Click Here to Download Data').first())
+    ]);
+    const stream = await download.createReadStream();
+    const chunks = [];
+    await new Promise((res, rej) => {
+      stream.on('data', c => chunks.push(c));
+      stream.on('end', res);
+      stream.on('error', rej);
+    });
+    const buf = Buffer.concat(chunks);
+    // Try UTF-8 first (likely for this source), fallback to UTF-16
+    csvText = buf.toString('utf8').replace(/^\uFEFF/, '');
+    if (!csvText.includes('Shooting Type') && !csvText.includes('Year')) {
+      csvText = buf.toString('utf16le').replace(/^\uFEFF/, '');
+    }
+    console.log('Portland: CSV downloaded, bytes:', buf.length);
+    console.log('Portland: CSV preview:', csvText.substring(0, 300));
+  } catch(e) {
+    console.log('Portland: download failed:', e.message);
+  }
+
+  await browser.close();
+
+  if (!csvText) throw new Error('Portland: could not download CSV');
+
+  // Parse: CSV with headers, filter Shooting Type = Homicide or Non-Fatal Injury
+  // Columns include: Occur Year, Shooting Type, Occurence Date
+  const lines = csvText.split('\n').map(function(l) { return l.replace(/\r/g, '').trim(); }).filter(Boolean);
+  const headers = lines[0].split(',').map(function(h) { return h.replace(/"/g, '').trim(); });
+  console.log('Portland: headers:', headers);
+
+  var yearCol  = headers.indexOf('Occur Year');
+  var typeCol  = headers.indexOf('Shooting Type');
+  var dateCol  = headers.indexOf('Occurence Date');
+  console.log('Portland: yearCol=' + yearCol + ' typeCol=' + typeCol + ' dateCol=' + dateCol);
+
+  // Also handle tab-delimited
+  if (yearCol < 0) {
+    var hdrTab = lines[0].split('\t').map(function(h) { return h.replace(/"/g, '').trim(); });
+    yearCol = hdrTab.indexOf('Occur Year');
+    typeCol = hdrTab.indexOf('Shooting Type');
+    dateCol = hdrTab.indexOf('Occurence Date');
+    if (yearCol >= 0) {
+      console.log('Portland: tab-delimited detected');
+      // re-parse as tab
+      var reparse = lines.map(function(l) { return l.split('\t').map(function(c) { return c.replace(/"/g, '').trim(); }); });
+      var ytd = 0, prior = 0;
+      var maxDate = null;
+      for (var i = 1; i < reparse.length; i++) {
+        var row = reparse[i];
+        var rowYr   = row[yearCol];
+        var rowType = row[typeCol];
+        if (rowType !== 'Homicide' && rowType !== 'Non-Fatal Injury') continue;
+        if (rowYr === String(yr))     { ytd++;   if (dateCol >= 0 && row[dateCol] > (maxDate||'')) maxDate = row[dateCol]; }
+        if (rowYr === String(yr - 1)) { prior++; }
+      }
+      console.log('Portland (tab) final: ytd=' + ytd + ' prior=' + prior + ' maxDate=' + maxDate);
+      if (ytd === 0 && prior === 0) throw new Error('Portland: parsed all zeros from tab CSV');
+      return { ytd: ytd, prior: prior, asof: maxDate ? maxDate.replace(/(\d+)\/(\d+)\/(\d+)/, '$3-$1-$2').replace(/-(\d)-/g, '-0$1-').replace(/-(\d)$/, '-0$1') : yr + '-12-31' };
+    }
+    throw new Error('Portland: could not find expected columns. Headers: ' + lines[0].substring(0, 200));
+  }
+
+  // CSV-delimited
+  var ytd = 0, prior = 0, maxDate = null;
+  for (var i = 1; i < lines.length; i++) {
+    var cols = lines[i].split(',').map(function(c) { return c.replace(/"/g, '').trim(); });
+    var rowYr   = cols[yearCol];
+    var rowType = cols[typeCol];
+    if (rowType !== 'Homicide' && rowType !== 'Non-Fatal Injury') continue;
+    if (rowYr === String(yr))     { ytd++;   if (dateCol >= 0 && cols[dateCol] > (maxDate||'')) maxDate = cols[dateCol]; }
+    if (rowYr === String(yr - 1)) prior++;
+  }
+
+  console.log('Portland final: ytd=' + ytd + ' prior=' + prior + ' maxDate=' + maxDate);
+  if (ytd === 0 && prior === 0) throw new Error('Portland: parsed all zeros — check CSV structure');
+
+  // Convert M/D/YYYY to YYYY-MM-DD
+  var asof = yr + '-12-31';
+  if (maxDate) {
+    var parts = maxDate.split('/');
+    if (parts.length === 3) {
+      asof = parts[2] + '-' + parts[0].padStart(2,'0') + '-' + parts[1].padStart(2,'0');
+    }
+  }
+
+  return { ytd: ytd, prior: prior, asof: asof };
+}
