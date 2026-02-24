@@ -1085,51 +1085,108 @@ async function fetchPortland() {
     }
   }
 
-  // Try to intercept the CSV download
+  // Strategy 1: click "Click Here to Download Data" page link (on the Download Open Data sheet)
   let csvText = null;
-  const linkCandidates = [
-    'text=Click Here to Download Data',
-    'text=Download Data',
-    'text=Click Here',
-    'a[href*=".csv"]',
-    'a[href*="download"]',
-    'button:has-text("Download")',
-  ];
-  for (const sel of linkCandidates) {
+  try {
+    const [ dl ] = await Promise.all([
+      page.waitForEvent('download', { timeout: 10000 }),
+      page.evaluate(function() {
+        var all = Array.from(document.querySelectorAll('a, button, [role="button"]'));
+        var el = all.find(function(e) {
+          var t = (e.innerText || e.textContent || '').trim().toLowerCase();
+          return t.includes('click here') || t.includes('download data') || t.includes('download the data');
+        });
+        if (el) { el.click(); return true; }
+        throw new Error('no page download link found');
+      })
+    ]);
+    const stream = await dl.createReadStream();
+    const chunks = [];
+    await new Promise(function(res, rej) { stream.on('data', function(c) { chunks.push(c); }); stream.on('end', res); stream.on('error', rej); });
+    const buf = Buffer.concat(chunks);
+    csvText = buf.toString('utf8').replace(/^\uFEFF/, '');
+    console.log('Portland: downloaded via page link | bytes:', buf.length);
+    console.log('Portland: CSV preview:', csvText.substring(0, 200));
+  } catch(e) {
+    console.log('Portland: page link download failed:', e.message.split('\n')[0]);
+  }
+
+  // Strategy 2: Tableau toolbar Download → Crosstab (same pattern as Milwaukee)
+  if (!csvText) {
     try {
-      const [ download ] = await Promise.all([
-        page.waitForEvent('download', { timeout: 15000 }),
-        forceClick(page.locator(sel).first(), 5000)
-      ]);
-      const stream = await download.createReadStream();
-      const chunks = [];
-      await new Promise(function(res, rej) {
-        stream.on('data', function(c) { chunks.push(c); });
-        stream.on('end', res);
-        stream.on('error', rej);
+      console.log('Portland: trying toolbar Download → Crosstab...');
+      // Click the toolbar Download button
+      await page.evaluate(function() {
+        var all = Array.from(document.querySelectorAll('button, [role="button"], a'));
+        var el = all.find(function(e) {
+          var t = (e.innerText || e.textContent || '').trim();
+          return t === 'Download';
+        });
+        if (el) el.click();
+        else throw new Error('toolbar Download button not found');
       });
-      const buf = Buffer.concat(chunks);
-      csvText = buf.toString('utf8').replace(/^\uFEFF/, '');
-      if (!csvText.includes(',') && !csvText.includes('\t')) {
-        csvText = buf.toString('utf16le').replace(/^\uFEFF/, '');
-      }
-      console.log('Portland: downloaded via:', sel, '| bytes:', buf.length);
-      console.log('Portland: CSV preview:', csvText.substring(0, 300));
-      break;
+      await page.waitForTimeout(2000);
+
+      // Log what appeared in the download menu
+      const menuItems = await page.evaluate(function() {
+        return Array.from(document.querySelectorAll('[role="menuitem"], [class*="menu"] li, [class*="MenuItem"]'))
+          .map(function(e) { return (e.innerText || e.textContent || '').trim(); })
+          .filter(function(t) { return t.length > 1; });
+      });
+      console.log('Portland: download menu items:', JSON.stringify(menuItems));
+
+      // Click Crosstab
+      await page.evaluate(function() {
+        var all = Array.from(document.querySelectorAll('[role="menuitem"], li, button, a'));
+        var el = all.find(function(e) {
+          var t = (e.innerText || e.textContent || '').trim().toLowerCase();
+          return t === 'crosstab' || t.includes('crosstab');
+        });
+        if (el) el.click();
+        else throw new Error('Crosstab menu item not found');
+      });
+      await page.waitForTimeout(2000);
+
+      // In Crosstab dialog: select CSV and download
+      const [ dl2 ] = await Promise.all([
+        page.waitForEvent('download', { timeout: 20000 }),
+        page.evaluate(function() {
+          // Try clicking CSV radio/option
+          var csvOpt = Array.from(document.querySelectorAll('input[type="radio"], label, button, [role="radio"]'))
+            .find(function(e) { return (e.innerText || e.textContent || e.value || '').trim().toLowerCase() === 'csv'; });
+          if (csvOpt) csvOpt.click();
+          // Then click Download button in dialog
+          var dlBtn = Array.from(document.querySelectorAll('button'))
+            .find(function(e) { return (e.innerText || e.textContent || '').trim().toLowerCase() === 'download'; });
+          if (dlBtn) { dlBtn.click(); return true; }
+          throw new Error('Download button in dialog not found');
+        })
+      ]);
+      const stream2 = await dl2.createReadStream();
+      const chunks2 = [];
+      await new Promise(function(res, rej) { stream2.on('data', function(c) { chunks2.push(c); }); stream2.on('end', res); stream2.on('error', rej); });
+      const buf2 = Buffer.concat(chunks2);
+      csvText = buf2.toString('utf8').replace(/^\uFEFF/, '');
+      if (!csvText.includes(',') && !csvText.includes('\t')) csvText = buf2.toString('utf16le').replace(/^\uFEFF/, '');
+      console.log('Portland: downloaded via toolbar Crosstab | bytes:', buf2.length);
+      console.log('Portland: CSV preview:', csvText.substring(0, 200));
     } catch(e) {
-      console.log('Portland: download selector failed:', sel, '-', e.message.split('\n')[0]);
+      console.log('Portland: toolbar Crosstab failed:', e.message.split('\n')[0]);
     }
   }
 
-  // If still no CSV, log all links/buttons (safe version — no className access)
+  // Diagnostic: if still no CSV log page state
   if (!csvText) {
-    const links = await page.evaluate(function() {
-      var els = document.querySelectorAll('a, button');
-      return Array.from(els).map(function(e) {
-        return (e.textContent || '').trim().substring(0,50) + ' | href=' + (e.href||'');
-      }).filter(function(s) { return s.trim().length > 3; }).slice(0, 40);
+    const pageState = await page.evaluate(function() {
+      return {
+        text: document.body.innerText.substring(0, 600),
+        links: Array.from(document.querySelectorAll('a, button')).map(function(e) {
+          return (e.innerText || e.textContent || '').trim().substring(0, 50);
+        }).filter(function(t) { return t.length > 2; }).slice(0, 30)
+      };
     });
-    console.log('Portland: all links/buttons:', JSON.stringify(links, null, 1));
+    console.log('Portland: page text after tab click:', pageState.text);
+    console.log('Portland: buttons/links:', JSON.stringify(pageState.links));
   }
 
   await browser.close();
