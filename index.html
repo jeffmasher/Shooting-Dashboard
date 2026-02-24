@@ -1034,7 +1034,8 @@ var CITIES = [
   },
   {
     id: 'buffalo',
-    name: 'Buffalo, NY',
+    name: 'New York GIVE (28 Agencies)',
+    noteHtml: '<a href="https://www.criminaljustice.ny.gov/crimnet/ojsa/tableau_Give_Shooting_Activity.htm" target="_blank" style="color:inherit;text-decoration:underline">More Info</a>',
     note: 'Shooting Victims + Gun Homicides (GIVE)',
     type: 'Victims',
     dataUrl: 'https://mypublicdashboard.ny.gov/t/OJRP_PUBLIC/views/GIVEInitiative/GIVE-LandingPage',
@@ -1316,7 +1317,7 @@ function render() {
 
     var manualBtn = city.manual ? ' <button class="manual-btn" onclick="openManual(\'' + city.id + '\')" title="Edit">✎ Edit</button>' + (city.dataUrl ? ' <a class="manual-btn" href="' + city.dataUrl + '" target="_blank" title="Open source">↗ Source</a>' : '') : '';
     return divider + '<tr' + (city.manual ? ' class="manual-row"' : '') + '>' +
-      '<td><div class="city-name"><span class="dot dot-ok"></span>' + city.name + manualBtn + '</div></td>' +
+      '<td><div class="city-name"><span class="dot dot-ok"></span>' + city.name + manualBtn + '</div>' + (city.noteHtml ? '<div class="city-note">' + city.noteHtml + '</div>' : '') + '</td>' +
       '<td class="num">' + (s.ytd != null ? s.ytd.toLocaleString() : '—') + '</td>' +
       '<td class="num" style="color:var(--muted2)">' + (s.prior != null ? s.prior.toLocaleString() : '—') + '<div style="font-family:var(--muted);font-size:9px;color:var(--muted);margin-top:2px">thru ' + (s.priorEnd || '') + '</div></td>' +
       '<td class="chg">' + chgHtml + '</td>' +
