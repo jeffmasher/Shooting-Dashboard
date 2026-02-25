@@ -1036,23 +1036,27 @@ async function fetchWilmington() {
   }
 
   // Fallback: scan doc IDs near the known working one (8310 = week of 2026-02-19)
-  // IDs increment each week, so check upward first
+  // CivicPlus showpublisheddocument/{id} without ticks should redirect to latest version.
+  // Try both with and without following redirects.
   console.log('Wilmington: scanning doc IDs...');
-  const scanIds = [8325, 8320, 8317, 8315, 8312, 8311, 8310, 8309, 8308, 8305, 8300];
+  // Scan wider range: 8310 +/- 20
+  const scanIds = [];
+  for (let id = 8330; id >= 8290; id--) scanIds.push(id);
+
   for (const docId of scanIds) {
-    for (const tmpl of [
-      'https://www.wilmingtonde.gov/home/showpublisheddocument/' + docId,
-      'https://www.wilmingtonde.gov/Home/ShowDocument?id=' + docId,
-    ]) {
-      const r = await fetchUrl(tmpl).catch(() => null);
-      if (r && r.status === 200 && r.body[0] === 0x25 && r.body[1] === 0x50) {
-        console.log('Wilmington: found PDF at', tmpl);
-        return await parseWilmingtonPdf(r.body, tmpl);
+    // Try showpublisheddocument without ticks (CivicPlus canonical URL)
+    const url1 = 'https://www.wilmingtonde.gov/home/showpublisheddocument/' + docId;
+    const r1 = await fetchUrl(url1, 10000).catch(() => null);
+    if (r1) {
+      console.log('Wilmington: docId', docId, 'status:', r1.status, 'bytes:', r1.body.length, 'magic:', r1.body.slice(0,4).toString('hex'));
+      if (r1.status === 200 && r1.body[0] === 0x25 && r1.body[1] === 0x50) {
+        console.log('Wilmington: found PDF at', url1);
+        return await parseWilmingtonPdf(r1.body, url1);
       }
     }
   }
 
-  throw new Error('Wilmington: could not find PDF via index page or doc ID scan');
+  throw new Error('Wilmington: could not find PDF via index page or doc ID scan (tried 8290-8330)');
 }
 
 async function parseWilmingtonPdf(pdfBuf, sourceUrl) {
@@ -1347,7 +1351,7 @@ async function fetchNashville() {
 
   await page.goto(
     'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:embed=y&:showVizHome=no',
-    { waitUntil: 'networkidle', timeout: 60000 }
+    { waitUntil: 'domcontentloaded', timeout: 60000 }
   );
   await page.waitForTimeout(5000);
 
