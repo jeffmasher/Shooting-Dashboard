@@ -1336,7 +1336,6 @@ async function fetchPortland() {
 
 async function fetchNashville() {
   const pdfParseModule = require('pdf-parse');
-  const pdfParse = pdfParseModule.PDFParse || pdfParseModule.default || pdfParseModule;
 
   // ── Date utilities ──
   // Reports use Saturday dates in the filename: YYYYMMDD
@@ -1505,11 +1504,25 @@ async function fetchNashville() {
   // ── Parse the PDF ──
   console.log('Nashville: parsing', path.basename(pdfPath));
   const pdfBuffer = fs.readFileSync(pdfPath);
-  const data = await pdfParse(pdfBuffer);
+  let data;
+  let pages;
+  if (pdfParseModule.PDFParse) {
+    // Newer pdf-parse: class-based API
+    const parser = new pdfParseModule.PDFParse({ data: pdfBuffer });
+    await parser.load();
+    const result = await parser.getText();
+    data = { text: result.text, numpages: result.total };
+    // New API: pages array has per-page text objects {text, num}
+    pages = result.pages.map(p => p.text);
+  } else {
+    // Older pdf-parse: function-based API
+    const fn = pdfParseModule.default || pdfParseModule;
+    data = await fn(pdfBuffer);
+    pages = data.text.split(/\f/);
+  }
   console.log('Nashville: PDF has', data.numpages, 'pages');
 
   // Split into pages and find the Gunshot Victims page
-  const pages = data.text.split(/\f/);
   const targetIdx = findGunShotVictimsPage(pages);
   if (targetIdx === -1) {
     throw new Error('Nashville: could not find "Gunshot Victims" page in PDF');
