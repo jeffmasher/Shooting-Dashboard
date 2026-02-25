@@ -1625,8 +1625,8 @@ function exportJPEG() {
   // ── Color palette ─────────────────────────────────────────────────────────
   var FT_SALMON  = '#0D1B2A';   // dark navy background
   var FT_DARK    = '#F5E6C8';   // warm gold primary text
-  var FT_MID     = '#B8A88A';   // muted gold secondary text
-  var FT_LIGHT   = '#6B5F4E';   // dim gold muted
+  var FT_MID     = '#FFFFFF';   // white secondary text
+  var FT_LIGHT   = '#FFFFFF';   // white muted text
   var FT_RED     = '#E05555';   // increase = bad (softened red on dark)
   var FT_GREEN   = '#5DBB8A';   // decrease = good (mint green on dark)
   var FT_BORDER  = '#1E3248';   // subtle navy border
@@ -1743,7 +1743,7 @@ function exportJPEG() {
   ctx.fillText('TOTAL (' + rows.length + ' agencies)', colCity, ty);
   ctx.textAlign = 'right';
   ctx.fillText(totalYtd.toLocaleString(), colYTD, ty);
-  ctx.fillStyle = 'rgba(13,27,42,0.65)';
+  ctx.fillStyle = '#FFFFFF';
   ctx.font = '13px Georgia, serif';
   ctx.fillText(totalPrior.toLocaleString(), colPrior, ty);
   if (totalChg != null) {
