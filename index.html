@@ -82,15 +82,6 @@
   }
   .controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-  .year-select {
-    background: var(--bg); color: var(--text); border: 1px solid var(--border2);
-    font-family: 'IBM Plex Mono', monospace; font-size: 11px;
-    padding: 8px 28px 8px 12px; outline: none; cursor: pointer; appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23999999'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: right 10px center;
-  }
-  .year-select:focus { border-color: var(--text); outline: 1px solid var(--text); }
-
   .btn {
     font-family: 'IBM Plex Mono', monospace; font-size: 11px; font-weight: 500;
     letter-spacing: 1px; text-transform: uppercase; padding: 8px 18px;
@@ -253,10 +244,6 @@
       <div class="title-meta">Year-to-Date · Major US Cities · Open Data Portals</div>
     </div>
     <div class="controls">
-      <select class="year-select" id="yearSel" onchange="onYearChange()">
-        <option value="2026">2026</option>
-        <option value="2025">2025</option>
-      </select>
       <button class="btn btn-ghost" id="exportBtn" onclick="exportCSV()" disabled>↓ CSV</button>
       <button class="btn btn-ghost" id="jpegBtn" onclick="exportJPEG()" disabled>↓ JPEG</button>
     </div>
@@ -299,10 +286,11 @@
           <th class="r" onclick="doSort('chg')">% Change</th>
           <th class="r" onclick="doSort('asof')">As Of</th>
           <th onclick="doSort('type')">Type</th>
+          <th>Source</th>
         </tr>
       </thead>
       <tbody id="tbody">
-        <tr><td colspan="5" class="empty-state"><span class="big">READY</span><p>CLICK REFRESH ALL TO FETCH LIVE DATA</p></td></tr>
+        <tr><td colspan="7" class="empty-state"><span class="big">READY</span><p>CLICK REFRESH ALL TO FETCH LIVE DATA</p></td></tr>
       </tbody>
     </table>
   </div>
@@ -409,6 +397,7 @@ var CITIES = [
     type: 'Victims',
     name: 'Chicago, IL',
     note: 'Shooting Victims (GUNSHOT_INJURY_I=YES)',
+    dataUrl: 'https://data.cityofchicago.org/Public-Safety/Violence-Reduction-Victims-of-Homicides-and-Non-Fa/gumc-mgzr',
     _url: 'https://data.cityofchicago.org/resource/gumc-mgzr.json',
     count: async function(s, e) {
       var where = "date >= '" + s + "T00:00:00.000' AND date <= '" + e + "T23:59:59.000' AND gunshot_injury_i = 'YES'";
@@ -433,6 +422,7 @@ var CITIES = [
     type: 'Victims',
     name: 'New York City, NY',
     note: 'Shooting Victims (NYPD CompStat PDF)',
+    dataUrl: 'https://www.nyc.gov/site/nypd/stats/crime-statistics/citywide-crime-stats.page',
     _pdfUrl: 'https://www.nyc.gov/assets/nypd/downloads/pdf/crime_statistics/cs-en-us-city.pdf',
     _parsed: null,
     _parse: async function() {
@@ -488,6 +478,7 @@ var CITIES = [
     type: 'Victims',
     name: 'Philadelphia, PA',
     note: 'Shooting Victims (Carto SQL)',
+    dataUrl: 'https://www.opendataphilly.org/datasets/shooting-victims/',
     count: async function(s, e) {
       var sql = "SELECT COUNT(*) AS n FROM shootings WHERE date_ >= '" + s + "' AND date_ <= '" + e + "'";
       var url = 'https://phl.carto.com/api/v2/sql?format=json&q=' + encodeURIComponent(sql);
@@ -513,6 +504,7 @@ var CITIES = [
     type: 'Victims',
     name: 'Baltimore, MD',
     note: 'Shooting Incidents (NIBRS, Shooting=Y)',
+    dataUrl: 'https://data.baltimorecity.gov/',
     _url: 'https://services1.arcgis.com/UWYHeuuJISiGmgXx/arcgis/rest/services/NIBRS_GroupA_Crime_Data/FeatureServer/0/query',
     count: async function(s, e) {
       var where = "Shooting = 'Y' AND CrimeDateTime >= DATE '" + s + "' AND CrimeDateTime <= DATE '" + e + "'";
@@ -569,6 +561,7 @@ var CITIES = [
     type: 'Victims',
     name: 'Boston, MA',
     note: 'Shooting Incidents (CSV)',
+    dataUrl: 'https://data.boston.gov/dataset/shootings',
     _csvUrl: 'https://data.boston.gov/datastore/dump/73c7e069-701f-4910-986d-b950f46c91a1?bom=True',
     _cache: null,
     _load: async function() {
@@ -607,6 +600,7 @@ var CITIES = [
     type: 'Victims',
     name: 'Louisville, KY',
     note: 'Gun Violence Victims (Non-Fatal + Homicide)',
+    dataUrl: 'https://hub.arcgis.com/datasets/LOJIC::louisville-metro-ky-gun-violence-data/about',
     _url: 'https://services1.arcgis.com/79kfd2K6fskCAkyg/arcgis/rest/services/Gun_Violence_Data/FeatureServer/0/query',
     count: async function(s, e) {
       var where = "(Crime_Type = 'Non-Fatal Shooting' OR Crime_Type = 'Homicide')" +
@@ -667,6 +661,7 @@ var CITIES = [
     type: 'Victims',
     name: 'Cincinnati, OH',
     note: 'Shooting Victims (Socrata)',
+    dataUrl: 'https://data.cincinnati-oh.gov/safety/PDI-Police-Data-Initiative-Crime-Incidents/k59e-2pvf',
     _url: 'https://data.cincinnati-oh.gov/resource/sfea-4ksu.json',
     _fmt: function(d) { return d.replace(/-/g, ''); }, // YYYY-MM-DD -> YYYYMMDD
     count: async function(s, e) {
@@ -692,6 +687,7 @@ var CITIES = [
     name: 'St. Louis, MO',
     note: 'Shooting Victims (CompStat PDF)',
     type: 'Victims',
+    dataUrl: 'https://slmpd.org/crime-statistics/',
     _pdfUrl: 'https://slmpd.org/wp-content/uploads/httpdocs/CompStat/Compstat01A.PDF',
     _parsed: null,
     _parse: async function() {
@@ -806,6 +802,7 @@ var CITIES = [
     name: 'New Orleans, LA',
     note: 'Shooting Incidents (CFS, 30S/34S RTF)',
     type: 'Incidents',
+    dataUrl: 'https://data.nola.gov/Public-Safety-and-Preparedness/Calls-for-Service-2026/es9j-6y5d',
     _datasets: {
       '2026': 'https://data.nola.gov/resource/es9j-6y5d.json',
       '2025': 'https://data.nola.gov/resource/4xwx-sfte.json'
@@ -845,6 +842,7 @@ var CITIES = [
     name: 'Rochester, NY',
     note: 'Shooting Victims (ArcGIS)',
     type: 'Victims',
+    dataUrl: 'https://data-rpdny.opendata.arcgis.com/',
     _url: 'https://services7.arcgis.com/wMvCpnbQEKXZsPSQ/arcgis/rest/services/Rochester_NY_Shooting_Victims/FeatureServer/0/query',
     count: async function(s, e) {
       var where = "Occurred_Date >= '" + s + " 00:00:00' AND Occurred_Date <= '" + e + " 23:59:59'";
@@ -923,6 +921,7 @@ var CITIES = [
     name: 'Minneapolis, MN',
     note: 'Gunshot Wound Victims (sum of Crime_Count)',
     type: 'Non-Fatal',
+    dataUrl: 'https://opendata.minneapolismn.gov/datasets/minneapolis::crime-data/about',
     _url: 'https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Crime_Data/FeatureServer/0/query',
     count: async function(s, e) {
       var where = "Type = 'Gunshot Wound Victims'" +
@@ -985,6 +984,7 @@ var CITIES = [
     name: 'Milwaukee, WI',
     note: 'Non-Fatal Shootings (Tableau)',
     type: 'Non-Fatal',
+    dataUrl: 'https://www.milwaukee.gov/police/Information-Services/Crime-Maps-and-Statistics',
     count: async function(s, e) {
       var auto = await loadAutoData();
       if (auto.milwaukee && auto.milwaukee.ok) {
@@ -1006,6 +1006,7 @@ var CITIES = [
     name: 'Las Vegas, NV',
     note: 'Shooting Victims (NIBRS, ShootingVictims=Y)',
     type: 'Victims',
+    dataUrl: 'https://www.lvmpd.com/en-us/Pages/CompStat.aspx',
     _url: 'https://services.arcgis.com/jjSk6t82vIntwDbs/arcgis/rest/services/LVMPD_Weekly_NIBRS_Crimes/FeatureServer/0/query',
     count: async function(s, e) {
       var where = "ShootingVictims = 'Y' AND ReportedOn >= '" + s + " 00:00:00' AND ReportedOn <= '" + e + " 23:59:59'";
@@ -1180,7 +1181,7 @@ function closeManual() {
 
 async function saveManual() {
   if (!_manualCityId) return;
-  var year = parseInt(document.getElementById('yearSel').value);
+  var year = CURRENT_YEAR;
   var ytd   = document.getElementById('manualYtd').value.trim();
   var prior = document.getElementById('manualPrior').value.trim();
   var asof  = document.getElementById('manualAsof').value.trim();
@@ -1217,7 +1218,7 @@ document.addEventListener('click', function(e) {
 
 
 async function fetchAll() {
-  var year = parseInt(document.getElementById('yearSel').value);
+  var year = CURRENT_YEAR;
   var w = getWindows(year);
 
   document.getElementById('exportBtn').disabled = true;
@@ -1362,7 +1363,7 @@ function render() {
         s.status === 'ok' && s.ytd == null && s.prior == null &&
         sortField === 'ytd' && sortDir === -1) {
       firstEmptyManualSeen = true;
-      divider = '<tr class="divider-row"><td colspan="6"><span>── MANUAL ENTRY ──────────────────────────</span></td></tr>';
+      divider = '<tr class="divider-row"><td colspan="7"><span>── MANUAL ENTRY ──────────────────────────</span></td></tr>';
     }
 
     if (s.status === 'loading') {
@@ -1370,12 +1371,12 @@ function render() {
         '<td class="num"><span class="sk" style="width:52px"></span></td>' +
         '<td class="num"><span class="sk" style="width:52px"></span></td>' +
         '<td class="chg"><span class="sk" style="width:60px"></span></td>' +
-        '<td class="asof"><span class="sk" style="width:72px"></span></td><td></td></tr>';
+        '<td class="asof"><span class="sk" style="width:72px"></span></td><td></td><td></td></tr>';
     }
 
     if (s.status === 'error') {
       return divider + '<tr><td><div class="city-name"><span class="dot dot-error"></span>' + city.name + '</div></td>' +
-        '<td colspan="4"><span class="err-msg">' + (s.err || 'Fetch failed') + '</span></td><td class="type-badge"></td></tr>';
+        '<td colspan="4"><span class="err-msg">' + (s.err || 'Fetch failed') + '</span></td><td class="type-badge"></td><td></td></tr>';
     }
 
     var chgHtml = '<span class="chg-flat">—</span>';
@@ -1386,14 +1387,17 @@ function render() {
       chgHtml  = '<span class="' + cls + '">' + arr + sign + chgVal.toFixed(1) + '%</span>';
     }
 
-    var manualBtn = city.manual ? ' <button class="manual-btn" onclick="openManual(\'' + city.id + '\')" title="Edit">✎ Edit</button>' + (city.dataUrl ? ' <a class="manual-btn" href="' + city.dataUrl + '" target="_blank" title="Open source">↗ Source</a>' : '') : '';
+    var manualBtn = city.manual ? ' <button class="manual-btn" onclick="openManual(\'' + city.id + '\')" title="Edit">✎ Edit</button>' : '';
+    var srcUrl = city.dataUrl || city._pdfUrl || city._csvUrl || city._url || (city._datasets ? city._datasets[Object.keys(city._datasets)[0]] : null);
+    var sourceLink = srcUrl ? '<a class="manual-btn" href="' + srcUrl + '" target="_blank" title="Open source">Source</a>' : '—';
     return divider + '<tr' + (city.manual ? ' class="manual-row"' : '') + '>' +
       '<td><div class="city-name"><span class="dot dot-ok"></span>' + city.name + manualBtn + '</div>' + (city.noteHtml ? '<div class="city-note">' + city.noteHtml + '</div>' : '') + '</td>' +
       '<td class="num">' + (s.ytd != null ? s.ytd.toLocaleString() : '—') + '</td>' +
-      '<td class="num" style="color:var(--muted2)">' + (s.prior != null ? s.prior.toLocaleString() : '—') + '<div style="font-family:var(--muted);font-size:9px;color:var(--muted);margin-top:2px">thru ' + (s.priorEnd || '') + '</div></td>' +
+      '<td class="num" style="color:var(--muted2)">' + (s.prior != null ? s.prior.toLocaleString() : '—') + '</td>' +
       '<td class="chg">' + chgHtml + '</td>' +
       '<td class="asof">' + (s.asof || '—') + '</td>' +
       '<td><span class="type-badge type-' + city.type.toLowerCase() + '">' + city.type + '</span></td>' +
+      '<td>' + sourceLink + '</td>' +
       '</tr>';
   }).join('');
 }
@@ -1417,20 +1421,6 @@ function updateSummary() {
   }
 }
 
-// ─── YEAR CHANGE ──────────────────────────────────────────────────────────────
-
-function onYearChange() {
-  state = {};
-  render();
-  ['s-cities','s-ytd','s-prior','s-chg'].forEach(function(id) {
-    var el = document.getElementById(id);
-    el.textContent = '—';
-    el.style.color = '';
-  });
-  document.getElementById('exportBtn').disabled = true;
-  document.getElementById('jpegBtn').disabled = true;
-  fetchAll();
-}
 
 // Auto-load on page open
 window.addEventListener('load', function() { fetchAll(); });
@@ -1439,7 +1429,7 @@ window.addEventListener('load', function() { fetchAll(); });
 
 
 function exportJPEG() {
-  var year = parseInt(document.getElementById('yearSel').value);
+  var year = CURRENT_YEAR;
   var now  = new Date().toISOString().slice(0, 10);
 
   // Gather cities with data only
@@ -1613,7 +1603,7 @@ function exportJPEG() {
 }
 
 function exportCSV() {
-  var year = document.getElementById('yearSel').value;
+  var year = String(CURRENT_YEAR);
   var w    = getWindows(parseInt(year));
   var now  = new Date().toISOString().slice(0, 10);
 
