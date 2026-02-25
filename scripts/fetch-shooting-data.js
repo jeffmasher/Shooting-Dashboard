@@ -1173,6 +1173,7 @@ async function main() {
     safe('Buffalo',    fetchBuffalo,    120000),
     safe('Nashville',  fetchNashville,  180000),
     safe('Hartford',   fetchHartford,   60000),
+    safe('Decatur',    fetchDecatur,    60000),
     // Wilmington removed — Akamai blocks all automated access; manual entry only
   ]);
 
@@ -1781,4 +1782,102 @@ function nashvilleFindValidGroups(nums) {
     }
   }
   return groups;
+}
+
+
+// ─── Decatur, IL (PowerDMS — DPD Shootings Hits PDF) ─────────────────────────
+// Document 2060598 is updated in-place by DPD Crime Analysis Unit.
+// The PDF has a clean text layer: each month row contains
+//   MONTH ATT2021..ATT2026 HIT2021..HIT2026 TOTAL_COLS...
+// We sum HIT2026 across all months with data for YTD, and the same months'
+// HIT2025 values for the prior-year comparison.
+// Strategy: Playwright loads the PowerDMS public viewer, clicks the Download
+// button, intercepts the download event, then parses with pdfjs.
+async function fetchDecatur() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext({ acceptDownloads: true });
+  const page = await context.newPage();
+
+  let pdfBuffer = null;
+
+  try {
+    console.log('Decatur: loading PowerDMS viewer...');
+    await page.goto('https://public.powerdms.com/Dec8366/tree/documents/2060598', {
+      waitUntil: 'networkidle',
+      timeout: 30000
+    });
+
+    // Try to find and click the Download button
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30000 }),
+      page.click('button:has-text("Download"), a:has-text("Download"), [aria-label*="Download"], [title*="Download"]')
+    ]);
+
+    const downloadPath = await download.path();
+    if (!downloadPath) throw new Error('Decatur: download path null');
+    pdfBuffer = require('fs').readFileSync(downloadPath);
+    console.log('Decatur: downloaded PDF (' + (pdfBuffer.length / 1024).toFixed(0) + ' KB)');
+  } finally {
+    await browser.close();
+  }
+
+  if (!pdfBuffer || pdfBuffer[0] !== 0x25) throw new Error('Decatur: invalid PDF');
+
+  // Parse PDF tokens from page 1
+  const tokens = await extractPdfTokens(pdfBuffer, 1);
+
+  // Month names we expect
+  const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUNE','JULY','AUG','SEPT','OCT','NOV','DEC'];
+
+  // Each month row (after the label) has 6 ATTEMPTS + 6 HITS + many TOTAL cols.
+  // HIT2025 = token index 5 (0-based after month label), HIT2026 = index 6 ... wait:
+  // Actually: ATT2021 ATT2022 ATT2023 ATT2024 ATT2025 ATT2026 HIT2021 HIT2022 HIT2023 HIT2024 HIT2025 HIT2026
+  // So after month label: [0..5] = attempts, [6..11] = hits. HIT2025=idx 10, HIT2026=idx 11.
+  const HIT2025_IDX = 10;
+  const HIT2026_IDX = 11;
+
+  let ytd2026 = 0;
+  let ytd2025 = 0;
+  let latestMonth = null;
+  let i = 0;
+
+  while (i < tokens.length) {
+    const tok = tokens[i].toUpperCase().trim();
+    if (MONTHS.includes(tok)) {
+      // Collect up to 26 numeric tokens for this row
+      const nums = [];
+      let j = i + 1;
+      while (nums.length < 26 && j < tokens.length) {
+        const n = parseInt(tokens[j]);
+        if (!isNaN(n)) nums.push(n);
+        else if (MONTHS.includes(tokens[j].toUpperCase()) || tokens[j].toUpperCase() === 'TOTAL') break;
+        j++;
+      }
+      // Full row with 2026 data: 6 ATT + 6 HIT + 12 TOTAL = 24 nums
+      // Row without 2026 data:   5 ATT + 5 HIT + 12 TOTAL = 22 nums
+      // Only process rows where 2026 is present (24+ nums)
+      if (nums.length >= 24) {
+        ytd2026 += nums[11]; // HIT2026
+        ytd2025 += nums[10]; // HIT2025
+        latestMonth = tok;
+      }
+      i = j;
+    } else {
+      i++;
+    }
+  }
+
+  // Build asof from latest month found + current year
+  const MONTH_MAP = {JAN:'01',FEB:'02',MAR:'03',APR:'04',MAY:'05',JUNE:'06',
+    JULY:'07',AUG:'08',SEPT:'09',OCT:'10',NOV:'11',DEC:'12'};
+  const MONTH_LAST = {JAN:'31',FEB:'28',MAR:'31',APR:'30',MAY:'31',JUNE:'30',
+    JULY:'31',AUG:'31',SEPT:'30',OCT:'31',NOV:'30',DEC:'31'};
+  const year = new Date().getFullYear();
+  const asof = latestMonth
+    ? year + '-' + MONTH_MAP[latestMonth] + '-' + MONTH_LAST[latestMonth]
+    : null;
+
+  console.log('Decatur: ytd=' + ytd2026 + ' prior=' + ytd2025 + ' asof=' + asof);
+  return { ytd: ytd2026, prior: ytd2025, asof: asof };
 }
