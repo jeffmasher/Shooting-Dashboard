@@ -1157,12 +1157,15 @@ async function fetchPortland() {
     'This is a Portland Police Bureau "Gun Violence Trends Report" Tableau dashboard showing the Year to Date Statistics table.',
     'The table has these rows: Homicide Victims, Homicides by Firearm Victims, Homicides by Firearm Incidents, Non-Fatal Injury Shooting Incidents, Non-Injury Shooting Incidents, Total Shooting Incidents.',
     'Columns include: Current YTD Count, Previous YTD Count.',
-    'Extract ONLY these two values:',
-    '  - "Homicides by Firearm Incidents" Current YTD Count → call it HOM',
-    '  - "Non-Fatal Injury Shooting Incidents" Current YTD Count → call it NFSI',
-    '  - "Homicides by Firearm Incidents" Previous YTD Count → call it HOM_PRIOR',
-    '  - "Non-Fatal Injury Shooting Incidents" Previous YTD Count → call it NFSI_PRIOR',
-    'Reply ONLY in this exact format with no other text: HOM=N NFSI=N HOM_PRIOR=N NFSI_PRIOR=N'
+    'There should also be a date range shown (e.g. "January 1, 2026 - February 15, 2026" or similar). Extract the END date of that range.',
+    'Extract these values:',
+    '  - "Homicides by Firearm Incidents" Current YTD Count → HOM',
+    '  - "Non-Fatal Injury Shooting Incidents" Current YTD Count → NFSI',
+    '  - "Homicides by Firearm Incidents" Previous YTD Count → HOM_PRIOR',
+    '  - "Non-Fatal Injury Shooting Incidents" Previous YTD Count → NFSI_PRIOR',
+    '  - The END date of the current YTD date range in YYYY-MM-DD format → ASOF',
+    'Reply ONLY in this exact format with no other text: HOM=N NFSI=N HOM_PRIOR=N NFSI_PRIOR=N ASOF=YYYY-MM-DD',
+    'If you cannot find the date range, omit ASOF entirely.'
   ].join(' ');
 
   async function callVision(imgB64) {
@@ -1211,6 +1214,13 @@ async function fetchPortland() {
   const nfsiPrior = extractVal(visionText, 'NFSI_PRIOR');
 
   console.log('Portland: hom=' + homYtd + ' nfsi=' + nfsiYtd + ' hom_prior=' + homPrior + ' nfsi_prior=' + nfsiPrior);
+
+  // Extract ASOF date from vision response if DOM parsing failed
+  if (!asof) {
+    const asofMatch = visionText.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
+    if (asofMatch) asof = asofMatch[1];
+    console.log('Portland: asof from vision:', asof);
+  }
 
   if (homYtd === null || nfsiYtd === null || homPrior === null || nfsiPrior === null) {
     throw new Error('Portland: vision parse failed: ' + visionText);
