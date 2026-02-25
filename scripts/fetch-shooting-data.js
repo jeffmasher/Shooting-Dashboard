@@ -1335,7 +1335,6 @@ async function fetchPortland() {
 // Page: ~146 "Gunshot Victims (Homicides, Injuries, and Property Damage)"
 
 async function fetchNashville() {
-  const pdfParseModule = require('pdf-parse');
 
   // ── Date utilities ──
   // Reports use Saturday dates in the filename: YYYYMMDD
@@ -1501,28 +1500,38 @@ async function fetchNashville() {
     throw new Error('Nashville: could not obtain Crime Initiative Book PDF. Place it manually in data/nashville-downloads/');
   }
 
-  // ── Parse the PDF ──
+  // ── Parse the PDF using pdfjs-dist (same lib used by Detroit/Durham) ──
   console.log('Nashville: parsing', path.basename(pdfPath));
   const pdfBuffer = fs.readFileSync(pdfPath);
-  let data;
-  let pages;
-  if (pdfParseModule.PDFParse) {
-    // Newer pdf-parse: class-based API
-    const parser = new pdfParseModule.PDFParse({ data: pdfBuffer });
-    await parser.load();
-    const result = await parser.getText();
-    data = { text: result.text, numpages: result.total };
-    // New API: pages array has per-page text objects {text, num}
-    pages = result.pages.map(p => p.text);
-  } else {
-    // Older pdf-parse: function-based API
-    const fn = pdfParseModule.default || pdfParseModule;
-    data = await fn(pdfBuffer);
-    pages = data.text.split(/\f/);
-  }
-  console.log('Nashville: PDF has', data.numpages, 'pages');
+  let pdfjsLib;
+  try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
+  catch(e) { pdfjsLib = require(path.join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer) }).promise;
+  console.log('Nashville: PDF has', pdf.numPages, 'pages');
 
-  // Split into pages and find the Gunshot Victims page
+  // Extract text from each page (group by y-coordinate to preserve lines)
+  const pages = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const pg = await pdf.getPage(i);
+    const tc = await pg.getTextContent();
+    // Group items by y-coordinate to reconstruct lines
+    let lastY = null;
+    let text = '';
+    for (const item of tc.items) {
+      const y = Math.round(item.transform[5]);
+      if (lastY !== null && Math.abs(y - lastY) > 2) {
+        text += '\n';
+      } else if (lastY !== null) {
+        text += ' ';
+      }
+      text += item.str;
+      lastY = y;
+    }
+    pages.push(text);
+  }
+
+  // Find the Gunshot Victims page
   const targetIdx = findGunShotVictimsPage(pages);
   if (targetIdx === -1) {
     throw new Error('Nashville: could not find "Gunshot Victims" page in PDF');
