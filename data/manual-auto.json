@@ -10,68 +10,73 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "durham": {
     "ytd": 16,
     "prior": 20,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 46,
     "prior": 56,
     "asof": "2026-02-23",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "memphis": {
     "ytd": 70,
     "prior": 97,
     "asof": "2026-02-24",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
     "asof": "2025-01-31",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "miamidade": {
     "ytd": 15,
     "prior": 27,
     "asof": "2026-02-20",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 12,
     "asof": "2026-02-24",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "portland": {
     "ytd": 9,
     "prior": 13,
     "asof": null,
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "buffalo": {
     "ytd": 39,
     "prior": 48,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-02-25T01:38:41.639Z",
+    "fetchedAt": "2026-02-25T02:16:13.175Z",
     "ok": true
   },
   "nashville": {
     "ok": false,
-    "error": "Nashville: Crosstab option not found",
-    "fetchedAt": "2026-02-25T01:38:41.639Z"
+    "error": "Nashville: CSV endpoint HTTP 404. Body: \r\n<!DOCTYPE html>\r\n\r\n<meta http-equiv=\"X-UA-Compatible\" content=\"IE=8\" />\r\n<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\" />\r\n<meta http-equiv=\"Expires\" content=\"Thu, 01 Jan 1970 00:00:00 GMT\"/>\r\n<meta http-equiv=\"Cache-Control\" content=\"no-cache, no-store\"/>\r\n<meta http-equiv=\"",
+    "fetchedAt": "2026-02-25T02:16:13.175Z"
+  },
+  "wilmington": {
+    "ok": false,
+    "error": "Wilmington: could not find any PDF link on index page",
+    "fetchedAt": "2026-02-25T02:16:13.175Z"
   }
 }
