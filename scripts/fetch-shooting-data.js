@@ -1266,223 +1266,319 @@ async function fetchPortland() {
 }
 
 
-// ─── Nashville (Tableau REST API - direct CSV export) ────────────────────────
-// Tableau Server exposes a CSV export endpoint: /views/ViewName/SheetName.csv
-// We need a valid session first (load the viz page via Playwright to get cookies),
-// then hit the CSV endpoint with those cookies. No toolbar interaction needed.
-// Full dataset → count by year client-side.
+// ─── Nashville (MNPD Crime Initiative Book PDF) ─────────────────────────────
+// Downloads the weekly Crime Initiative Book PDF from MNPD's public SharePoint
+// and extracts YTD shooting data from the "Gunshot Victims" page (~p.146).
+// Uses group-based triplet validation to reliably parse (prior, current, change)
+// values while naturally filtering out percentage columns.
+//
+// Source: https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public
+// PDF: YYYYMMDD_Crime_Initiative_Book.pdf (published weekly, typically Friday)
+// Page: ~146 "Gunshot Victims (Homicides, Injuries, and Property Damage)"
 
 async function fetchNashville() {
-  // Strategy: intercept Tableau's network responses to get the underlying data.
-  // The bootstrap JSON contains the viz data including filter values.
-  // We also try the Tableau "summary data" endpoint which exposes the aggregated
-  // values for each visible mark.
-  //
-  // Fallback: read the page text for the "Gunshot Injuries" count shown in the title
-  // area. The dashboard shows the total count in plain text: e.g. "33 Gunshot Injuries".
-  // The date range shown is "Last 2 months" by default — we just need that single number
-  // for YTD (current completed months). For prior year comparison, load the viz twice:
-  // once with default (current period) and once with a prior-year URL param workaround.
-  //
-  // SIMPLIFICATION: Given the complexity of monthly breakdown via UI interaction,
-  // we use a different approach:
-  // 1. Load viz → read total count from body text (the "N Gunshot Injuries" title text)
-  //    This gives us the current default date range count.
-  // 2. For each month needed, we use the Tableau vizql REST API's "get_underlying_data"
-  //    or the summary data endpoint to get filtered counts without needing UI interaction.
-  //
-  // The Tableau session token is obtained from the initial page load's network requests.
-  // Then we POST to /sessions/<token>/views/<viewId>/summary-data with filter params.
+  const pdfParse = require('pdf-parse');
 
-  const now = new Date();
-  const curYr = now.getFullYear();
-  const priorYr = curYr - 1;
-  const curMo = now.getMonth() + 1;
-  const completedThrough = curMo - 1;
-
-  const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const context = await browser.newContext();
-  const page = await context.newPage();
-  page.setDefaultTimeout(60000);
-
-  // Intercept network to capture Tableau session info and vizql responses
-  const capturedData = { sessionId: null, workbookName: null, viewName: null, bootstrapData: null };
-
-  await page.route('**', async (route) => {
-    const url = route.request().url();
-    // Look for the vizql bootstrap call which contains all viz data
-    if (url.includes('/vizql/w/') && url.includes('/sessions/')) {
-      const match = url.match(/\/vizql\/w\/([^/]+)\/v\/([^/]+)\/sessions\/([^/]+)\//);
-      if (match) {
-        capturedData.workbookName = match[1];
-        capturedData.viewName = match[2];
-        capturedData.sessionId = match[3];
-      }
+  // ── Date utilities ──
+  // Reports use Saturday dates in the filename: YYYYMMDD
+  function getReportDatesToTry() {
+    const dates = [];
+    const now = new Date();
+    for (let weeksBack = 0; weeksBack <= 4; weeksBack++) {
+      // Find recent Saturdays
+      const sat = new Date(now);
+      sat.setDate(sat.getDate() - sat.getDay() - 1 - (7 * weeksBack));
+      dates.push(formatDateStr(sat));
+      // Also try Fridays
+      const fri = new Date(sat);
+      fri.setDate(fri.getDate() - 1);
+      dates.push(formatDateStr(fri));
     }
-    await route.continue();
-  });
-
-  page.on('response', async (response) => {
-    const url = response.url();
-    if (url.includes('bootstrapSession') || url.includes('bootstrap-session')) {
-      try {
-        const text = await response.text().catch(() => '');
-        if (text.length > 1000) capturedData.bootstrapData = text;
-      } catch(e) {}
-    }
-  });
-
-  const vizUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:embed=y&:showVizHome=no';
-  console.log('Nashville: loading viz...');
-  await page.goto(vizUrl, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
-  await page.waitForTimeout(3000);
-
-  console.log('Nashville: session captured:', capturedData.sessionId ? 'YES' : 'NO', 'workbook:', capturedData.workbookName);
-
-  // Try to read the total count directly from page text
-  // The viz shows something like "Gunshot Injuries\nJan 1, 2026 - Jan 31, 2026\n33"
-  // or the Fatal/NonFatal breakdown
-  const bodyText = await page.evaluate(() => document.body.innerText);
-  console.log('Nashville: body snippet:', bodyText.substring(0, 600));
-
-  // Try to find the count in body text via several patterns
-  let defaultCount = null;
-  const titleMatch = bodyText.match(/Gunshot Injur[a-z]+[^\n]*?\n.*?(\d+)/s);
-  const fatalMatch = bodyText.match(/Fatal[^\d]*(\d+)[^\d]*Non-Fatal[^\d]*(\d+)/);
-  if (fatalMatch) {
-    defaultCount = parseInt(fatalMatch[1]) + parseInt(fatalMatch[2]);
-    console.log('Nashville: default count from fatal/nonfatal text:', defaultCount);
+    return [...new Set(dates)];
   }
 
-  // If we got session info, use the Tableau summary-data API for each month
-  const monthCounts = {};
-  
-  if (capturedData.sessionId && capturedData.workbookName && capturedData.viewName) {
-    console.log('Nashville: using vizql API for monthly data');
-    const baseApi = `https://policepublicdata.nashville.gov/vizql/w/${capturedData.workbookName}/v/${capturedData.viewName}/sessions/${capturedData.sessionId}`;
-    
-    // Use the set-parameter-value endpoint to change the date filter
-    // Then read summary data
-    async function getMonthViaAPI(year, month) {
-      const pad = n => String(n).padStart(2, '0');
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const dateFrom = `${pad(month)}/01/${year}`;
-      const dateTo = `${pad(month)}/${daysInMonth}/${year}`;
-      const label = `${year}-${pad(month)}`;
+  function formatDateStr(d) {
+    return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
+  }
 
-      // Try set-parameter endpoint
+  // ── PDF download strategies ──
+  const downloadDir = path.join(__dirname, '..', 'data', 'nashville-downloads');
+  if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
+
+  async function downloadPdf(dateStr) {
+    const year = dateStr.substring(0, 4);
+    const filename = `${dateStr}_Crime_Initiative_Book.pdf`;
+    const localPath = path.join(downloadDir, filename);
+
+    // Check for already-downloaded file
+    if (fs.existsSync(localPath) && fs.statSync(localPath).size > 100000) {
+      console.log('Nashville: using cached PDF:', filename);
+      return localPath;
+    }
+
+    // Strategy 1: Direct HTTP fetch (works if SharePoint allows anonymous access)
+    const directUrls = [
+      `https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public/Shared%20Documents/Weekly%20Crime%20-%20Initiative%20Book/${year}/${filename}`,
+      `https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public/_layouts/15/download.aspx?SourceUrl=/sites/MNPDCrimeAnalysis-Public/Shared%20Documents/Weekly%20Crime%20-%20Initiative%20Book/${year}/${filename}`,
+    ];
+
+    for (const url of directUrls) {
       try {
-        const resp = await page.request.post(`${baseApi}/commands/tabdoc/set-parameter-value`, {
-          data: { parameterName: 'Offense Report Date', value: `${dateFrom}-${dateTo}` },
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
-        const text = await resp.text();
-        const numMatch = text.match(/"fatal"[^:]*:(\d+)/i) || text.match(/count[^:]*:(\d+)/i);
-        if (numMatch) {
-          console.log('Nashville: API month', label, '=', numMatch[1]);
-          return parseInt(numMatch[1]);
+        console.log('Nashville: trying direct URL for', dateStr, '...');
+        const resp = await fetchUrl(url, 30000);
+        if (resp.status === 200 && resp.body.length > 100000 && resp.body[0] === 0x25 && resp.body[1] === 0x50) {
+          fs.writeFileSync(localPath, resp.body);
+          console.log('Nashville: downloaded via direct URL (' + (resp.body.length / 1024 / 1024).toFixed(1) + ' MB)');
+          return localPath;
         }
-      } catch(e) {
-        console.log('Nashville: API call failed for', label, e.message);
+      } catch (e) { /* try next */ }
+    }
+
+    // Strategy 2: Playwright (navigate SharePoint UI)
+    try {
+      console.log('Nashville: trying Playwright for', dateStr, '...');
+      const { chromium } = require('playwright');
+      const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+      const page = await browser.newPage();
+      await page.setViewportSize({ width: 1920, height: 1080 });
+
+      // Try loading the direct URL in Playwright (handles JS redirects SharePoint may do)
+      const spUrl = directUrls[0];
+      const response = await page.goto(spUrl, { waitUntil: 'networkidle', timeout: 45000 }).catch(() => null);
+
+      if (response) {
+        const contentType = response.headers()['content-type'] || '';
+        if (contentType.includes('pdf')) {
+          const buffer = await response.body().catch(() => null);
+          if (buffer && buffer.length > 100000) {
+            fs.writeFileSync(localPath, buffer);
+            await browser.close();
+            console.log('Nashville: downloaded via Playwright direct (' + (buffer.length / 1024 / 1024).toFixed(1) + ' MB)');
+            return localPath;
+          }
+        }
       }
-      return null;
+
+      // Navigate the SharePoint share link folder UI
+      const shareLink = 'https://metronashville.sharepoint.com/:f:/s/MNPDCrimeAnalysis-Public/Ei-WvJMw8N5OiETXZcnTwlgBlnNytrIMj_wiYADfzMln9g?e=L5g6b2';
+      console.log('Nashville: navigating SharePoint folder UI...');
+      await page.goto(shareLink, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
+      await page.waitForTimeout(5000);
+
+      // Click into the year folder
+      const yearEl = await page.locator(`text=${year}`).first();
+      if (await yearEl.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await yearEl.click();
+        await page.waitForTimeout(5000);
+      }
+
+      // Click the PDF file
+      const fileEl = await page.locator(`text=${dateStr}`).first();
+      if (await fileEl.isVisible({ timeout: 5000 }).catch(() => false)) {
+        await fileEl.click();
+        await page.waitForTimeout(3000);
+
+        // Find and click download button
+        for (const sel of ['[data-automationid="downloadCommand"]', '[aria-label*="Download"]', 'button:has-text("Download")']) {
+          try {
+            const btn = await page.locator(sel).first();
+            if (await btn.isVisible({ timeout: 3000 }).catch(() => false)) {
+              const [download] = await Promise.all([
+                page.waitForEvent('download', { timeout: 30000 }),
+                btn.click()
+              ]);
+              const stream = await download.createReadStream();
+              const chunks = [];
+              await new Promise((res, rej) => {
+                stream.on('data', c => chunks.push(c));
+                stream.on('end', res);
+                stream.on('error', rej);
+              });
+              const buf = Buffer.concat(chunks);
+              if (buf.length > 100000) {
+                fs.writeFileSync(localPath, buf);
+                await browser.close();
+                console.log('Nashville: downloaded via SharePoint UI (' + (buf.length / 1024 / 1024).toFixed(1) + ' MB)');
+                return localPath;
+              }
+              break;
+            }
+          } catch (e) { /* try next selector */ }
+        }
+      }
+
+      await browser.close();
+    } catch (e) {
+      console.log('Nashville: Playwright strategy failed:', e.message);
     }
 
-    // For now, fall through to screenshot approach since API structure is unknown
-    console.log('Nashville: vizql API structure unknown, falling back to screenshot');
-  }
-
-  // FINAL APPROACH: Since UI filter changes show wrong numbers (the filter controls
-  // a different view element, not the map), just capture the default YTD total.
-  // The dashboard shows January 2026 data by default (last completed month = Jan 2026).
-  // For prior year, take a screenshot with the prior year's data by navigating to
-  // a prior-year URL. This gives us YTD + prior as simple totals.
-  //
-  // For monthly breakdown: read the total from each month's page load with date URL params.
-  // Even though the URL param doesn't filter the map (confirmed), the PAGE TITLE does update
-  // to show the selected date range. The Fatal/NonFatal numbers in the header DO update.
-  // The issue in previous attempts was vision API reading wrong elements — use a more
-  // specific prompt targeting only the small number labels next to "Fatal" and "Non-Fatal".
-
-  async function getMonthByURLAndVision(year, month) {
-    const pad = n => String(n).padStart(2, '0');
-    const daysInMonth = new Date(year, month, 0).getDate();
-    const dateParam = `${pad(month)}%2F01%2F${year}-${pad(month)}%2F${daysInMonth}%2F${year}`;
-    const url = `https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:embed=y&:showVizHome=no&Offense+Report+Date=${dateParam}`;
-    const label = `${year}-${pad(month)}`;
-
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(5000);
-
-    // First try: read from body text
-    const txt = await page.evaluate(() => document.body.innerText);
-    const fm = txt.match(/Fatal[^\d]*(\d+)[^\d]*Non-Fatal[^\d]*(\d+)/);
-    if (fm) {
-      const total = parseInt(fm[1]) + parseInt(fm[2]);
-      console.log('Nashville: ' + label + ' from text: fatal=' + fm[1] + ' nonfatal=' + fm[2] + ' total=' + total);
-      return total;
-    }
-
-    // Log what text we see for debugging
-    console.log('Nashville: ' + label + ' body snippet:', txt.substring(0, 300));
-
-    // Fallback: screenshot + vision
-    const imgBuf = await page.screenshot({ fullPage: false });
-    const imgB64 = imgBuf.toString('base64');
-    const body = JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 32,
-      messages: [{ role: 'user', content: [
-        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imgB64 } },
-        { type: 'text', text: 'Look for two small number labels labeled "Fatal" and "Non-Fatal" (gunshot victim counts, typically single or double digits). These are NOT the map dots — they are text counters. Reply ONLY: FATAL=N NONFATAL=N' }
-      ]}]
-    });
-    const resp = await new Promise((resolve, reject) => {
-      const req = require('https').request({
-        hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY,
-                   'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(body) }
-      }, (res) => {
-        const chunks = []; res.on('data', c => chunks.push(c));
-        res.on('end', () => resolve(JSON.parse(Buffer.concat(chunks).toString())));
-      });
-      req.on('error', reject); req.write(body); req.end();
-    });
-    const text = (resp.content?.[0]?.text || '').trim();
-    const fM = text.match(/FATAL=(\d+)/);
-    const nfM = text.match(/NONFATAL=(\d+)/);
-    if (fM && nfM) {
-      const total = parseInt(fM[1]) + parseInt(nfM[1]);
-      console.log('Nashville: ' + label + ' vision: fatal=' + fM[1] + ' nonfatal=' + nfM[1] + ' total=' + total);
-      return total;
-    }
-    console.log('Nashville: ' + label + ' could not parse. vision response: ' + text);
     return null;
   }
 
-  // Fetch all months
-  for (let m = 1; m <= 12; m++) {
-    const key = priorYr + '-' + String(m).padStart(2, '0');
-    monthCounts[key] = await getMonthByURLAndVision(priorYr, m);
-  }
-  for (let m = 1; m <= completedThrough; m++) {
-    const key = curYr + '-' + String(m).padStart(2, '0');
-    monthCounts[key] = await getMonthByURLAndVision(curYr, m);
-  }
+  // ── Try to get a PDF ──
+  let pdfPath = null;
 
-  await browser.close();
-  console.log('Nashville: monthly counts:', JSON.stringify(monthCounts));
-
-  let ytd = 0, prior = 0;
-  for (let m = 1; m <= completedThrough; m++) {
-    ytd   += (monthCounts[curYr   + '-' + String(m).padStart(2,'0')] || 0);
-    prior += (monthCounts[priorYr + '-' + String(m).padStart(2,'0')] || 0);
+  // Check for any pre-committed PDF in data/nashville-downloads/
+  if (fs.existsSync(downloadDir)) {
+    const existing = fs.readdirSync(downloadDir)
+      .filter(f => f.endsWith('.pdf') && f.includes('Crime_Initiative_Book'))
+      .sort().reverse();
+    if (existing.length > 0) {
+      pdfPath = path.join(downloadDir, existing[0]);
+      console.log('Nashville: found local PDF:', existing[0]);
+    }
   }
 
-  const asof = new Date(curYr, completedThrough, 0).toISOString().slice(0, 10);
+  // Try downloading the latest if no local file
+  if (!pdfPath) {
+    const datesToTry = getReportDatesToTry();
+    console.log('Nashville: trying dates:', datesToTry.slice(0, 6).join(', '));
+    for (const dateStr of datesToTry) {
+      pdfPath = await downloadPdf(dateStr);
+      if (pdfPath) break;
+    }
+  }
+
+  if (!pdfPath) {
+    throw new Error('Nashville: could not obtain Crime Initiative Book PDF. Place it manually in data/nashville-downloads/');
+  }
+
+  // ── Parse the PDF ──
+  console.log('Nashville: parsing', path.basename(pdfPath));
+  const pdfBuffer = fs.readFileSync(pdfPath);
+  const data = await pdfParse(pdfBuffer);
+  console.log('Nashville: PDF has', data.numpages, 'pages');
+
+  // Split into pages and find the Gunshot Victims page
+  const pages = data.text.split(/\f/);
+  const targetIdx = findGunShotVictimsPage(pages);
+  if (targetIdx === -1) {
+    throw new Error('Nashville: could not find "Gunshot Victims" page in PDF');
+  }
+  console.log('Nashville: found Gunshot Victims page at page', targetIdx + 1);
+
+  // Parse the page
+  const pageText = pages[targetIdx];
+  const parsed = parseGunShotVictimsPage(pageText);
+
+  // Extract report date from filename
+  let asof = null;
+  const dateMatch = path.basename(pdfPath).match(/(\d{8})/);
+  if (dateMatch) {
+    const d = dateMatch[1];
+    asof = d.substring(0, 4) + '-' + d.substring(4, 6) + '-' + d.substring(6, 8);
+  }
+
+  console.log('Nashville: fatal=' + parsed.fatal.current + ' (prior=' + parsed.fatal.prior + ')');
+  console.log('Nashville: nonFatal=' + parsed.nonFatal.current + ' (prior=' + parsed.nonFatal.prior + ')');
+
+  const ytd = parsed.fatal.current + parsed.nonFatal.current;
+  const prior = parsed.fatal.prior + parsed.nonFatal.prior;
+
   console.log('Nashville: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
-  if (ytd === 0) throw new Error('Nashville: ytd is zero — all month fetches failed');
+  if (ytd === 0 && prior === 0) throw new Error('Nashville: parsed all zeros');
 
-  return { ytd, prior, asof, monthly: monthCounts };
+  return { ytd, prior, asof };
+}
+
+// ── Nashville PDF parser helpers ──
+
+function findGunShotVictimsPage(pages) {
+  // Search expected page 146 first, then nearby, then full scan
+  const expected = 145; // 0-indexed
+  const searchOrder = [expected];
+  for (let offset = 1; offset <= 15; offset++) {
+    searchOrder.push(expected + offset);
+    searchOrder.push(expected - offset);
+  }
+  for (let i = 0; i < pages.length; i++) {
+    if (!searchOrder.includes(i)) searchOrder.push(i);
+  }
+
+  for (const idx of searchOrder) {
+    if (idx < 0 || idx >= pages.length) continue;
+    const text = (pages[idx] || '').toUpperCase();
+    if (text.includes('GUNSHOT VICTIMS') &&
+        text.includes('COUNTY') &&
+        text.includes('GUNSHOT HOMICIDE') &&
+        text.includes('GUNSHOT INJURY')) {
+      return idx;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Parse the Gunshot Victims page.
+ * Uses group-based triplet validation: finds sequences of (prior, current, change)
+ * where change = current - prior. The 3rd such group in each row is the YTD data.
+ * Percentage values naturally don't form valid triplets, so they're skipped.
+ */
+function parseGunShotVictimsPage(pageText) {
+  const lines = pageText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+
+  const result = {
+    fatal:    { current: null, prior: null, change: null },
+    nonFatal: { current: null, prior: null, change: null },
+    propertyDamage: { current: null, prior: null, change: null },
+  };
+
+  // Find County section (totals)
+  let countyStart = -1;
+  for (let i = 0; i < lines.length; i++) {
+    if (/\bCounty\b/i.test(lines[i])) { countyStart = i; break; }
+  }
+  if (countyStart === -1) {
+    console.log('Nashville: WARNING - County row not found');
+    return result;
+  }
+
+  for (let i = countyStart; i < Math.min(countyStart + 8, lines.length); i++) {
+    const line = lines[i];
+    const upper = line.toUpperCase();
+    if (/^(Information summarized|Sourced from)/i.test(line)) break;
+
+    const nums = nashvilleExtractNumbers(line);
+    const groups = nashvilleFindValidGroups(nums);
+
+    if (upper.includes('GUNSHOT HOMICIDE') && groups.length >= 3) {
+      result.fatal = { prior: groups[2].prior, current: groups[2].current, change: groups[2].change };
+    } else if (upper.includes('GUNSHOT INJURY') && !upper.includes('HOMICIDE') && groups.length >= 3) {
+      result.nonFatal = { prior: groups[2].prior, current: groups[2].current, change: groups[2].change };
+    } else if (upper.includes('PROPERTY DAMAGE') && groups.length >= 3) {
+      result.propertyDamage = { prior: groups[2].prior, current: groups[2].current, change: groups[2].change };
+    }
+  }
+
+  return result;
+}
+
+function nashvilleExtractNumbers(text) {
+  var results = [];
+  var regex = /-?\d[\d,]*\.?\d*/g;
+  var match;
+  while ((match = regex.exec(text)) !== null) {
+    var val = parseFloat(match[0].replace(/,/g, ''));
+    if (!isNaN(val)) results.push(val);
+  }
+  return results;
+}
+
+/**
+ * Find valid (prior, current, change) triplets where change = current - prior.
+ * Percentage values naturally don't form valid triplets, so they're skipped.
+ */
+function nashvilleFindValidGroups(nums) {
+  var groups = [];
+  var i = 0;
+  while (i <= nums.length - 3) {
+    var v1 = nums[i], v2 = nums[i + 1], v3 = nums[i + 2];
+    if (v3 === v2 - v1) {
+      groups.push({ prior: v1, current: v2, change: v3 });
+      i += 3;
+    } else {
+      i++;
+    }
+  }
+  return groups;
 }
