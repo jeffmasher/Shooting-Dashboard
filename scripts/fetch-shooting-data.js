@@ -1065,8 +1065,18 @@ async function fetchPortland() {
 
   // Parse asof from "Current Year to Date: January 1, YYYY - Month D, YYYY"
   let asof = null;
-  const asofMatch = bodyText.match(/Current Year to Date:[^|]+\|\s*([A-Z][a-z]+ \d+, \d{4})/);
-  if (asofMatch) { const d = new Date(asofMatch[1]); if (!isNaN(d)) asof = d.toISOString().slice(0,10); }
+  // Date range appears as "January 1, 2026 - January 31, 2026" or with | separator
+  // We want the END date (second date = last day of coverage)
+  const asofMatch = bodyText.match(/Current Year to Date:[^\n]*?([A-Z][a-z]+ \d+, \d{4})\s*[-|]\s*([A-Z][a-z]+ \d+, \d{4})/);
+  if (asofMatch) {
+    const d = new Date(asofMatch[2]); // end date
+    if (!isNaN(d)) asof = d.toISOString().slice(0,10);
+  }
+  if (!asof) {
+    // Fallback: grab any date-like string near "to Date"
+    const m2 = bodyText.match(/([A-Z][a-z]+ \d+, \d{4})\s*[-|]\s*([A-Z][a-z]+ \d+, \d{4})/);
+    if (m2) { const d = new Date(m2[2]); if (!isNaN(d)) asof = d.toISOString().slice(0,10); }
+  }
   if (!asof) {
     const upd = bodyText.match(/Updated:\s*(\d+)\/(\d+)\/(\d+)/);
     if (upd) asof = upd[3] + '-' + upd[1].padStart(2,'0') + '-' + upd[2].padStart(2,'0');
@@ -1157,29 +1167,27 @@ async function fetchNashville() {
   const fs    = require('fs');
   const base  = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries';
 
-  async function downloadSheetCSV(filterParam) {
-    // Tableau Server CSV download URL
-    const url = base + '.csv?:showVizHome=no&:embed=true&' + filterParam;
-    console.log('Nashville: downloading CSV:', url);
+  // Helper: fetch a single sheet's CSV with redirect following
+  function fetchSheetCSV(sheetName, filterParam) {
+    const url = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/' +
+                sheetName + '.csv?:showVizHome=no&:embed=true&' + filterParam;
+    console.log('Nashville: fetching', sheetName, ':', url);
     return new Promise((resolve, reject) => {
-      const doReq = (reqUrl, redirects) => {
-        if (redirects > 5) return reject(new Error('Too many redirects'));
-        const urlObj = new URL(reqUrl);
-        const opts = { hostname: urlObj.hostname, path: urlObj.pathname + urlObj.search,
-                       method: 'GET', headers: { 'User-Agent': 'Mozilla/5.0' } };
-        require(urlObj.protocol === 'https:' ? 'https' : 'http').request(opts, (res) => {
-          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-            return doReq(new URL(res.headers.location, reqUrl).href, redirects + 1);
-          }
-          const chunks = [];
-          res.on('data', c => chunks.push(c));
-          res.on('end', () => {
-            const buf = Buffer.concat(chunks);
-            console.log('Nashville: HTTP', res.statusCode, 'bytes:', buf.length, 'type:', res.headers['content-type']);
-            if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode));
-            // Detect encoding
-            const text = (buf[0] === 0xFF && buf[1] === 0xFE) ? buf.toString('utf16le') : buf.toString('utf8');
-            resolve(text);
+      const doReq = (u, hops) => {
+        if (hops > 5) return reject(new Error('Too many redirects'));
+        const uo = new URL(u);
+        require(uo.protocol === 'https:' ? 'https' : 'http').request(
+          { hostname: uo.hostname, path: uo.pathname + uo.search, method: 'GET',
+            headers: { 'User-Agent': 'Mozilla/5.0' } }, (r) => {
+          if (r.statusCode >= 300 && r.statusCode < 400 && r.headers.location)
+            return doReq(new URL(r.headers.location, u).href, hops + 1);
+          const ch = []; r.on('data', c => ch.push(c));
+          r.on('end', () => {
+            const buf = Buffer.concat(ch);
+            const txt = (buf[0]===0xFF&&buf[1]===0xFE) ? buf.toString('utf16le') : buf.toString('utf8');
+            console.log('Nashville:', sheetName, 'HTTP', r.statusCode, 'bytes:', buf.length, 'preview:', txt.substring(0,150));
+            if (r.statusCode !== 200) return reject(new Error('HTTP ' + r.statusCode));
+            resolve(txt);
           });
         }).on('error', reject).end();
       };
@@ -1187,45 +1195,54 @@ async function fetchNashville() {
     });
   }
 
-  // Helper: count victim rows in CSV for a given year, up to MM/DD cutoff
-  function countVictims(csvText, targetYear, mmddCutoff) {
+  // Try Map sheet first (row-level data), fallback to default sheet (aggregated)
+  async function downloadSheetCSV(filterParam) {
+    for (const sheet of ['Map', 'GunshotInjuries']) {
+      try {
+        const csv = await fetchSheetCSV(sheet, filterParam);
+        if (csv.includes('I Rptdt')) { console.log('Nashville: got row-level data from', sheet); return csv; }
+        if (sheet === 'GunshotInjuries') { console.log('Nashville: using aggregated data'); return csv; }
+        console.log('Nashville:', sheet, 'is aggregated format, trying next...');
+      } catch(e) {
+        console.log('Nashville:', sheet, 'failed:', e.message.split('\n')[0]);
+      }
+    }
+    throw new Error('Nashville: all sheet downloads failed');
+  }
+
+  // Parse CSV — handles row-level (Map sheet) or aggregated (default sheet)
+  function parseCSV(csvText) {
     var lines = csvText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    var header = lines[0].replace(/^\uFEFF/, '').replace(/^\xFF\xFE/, '');
-    var cols = header.split('\t');
-    var rptdtIdx = cols.indexOf('I Rptdt');
-    if (rptdtIdx < 0) {
-      // Try comma-separated
-      cols = header.split(',');
-      rptdtIdx = cols.findIndex(function(c) { return c.replace(/"/g,'').trim() === 'I Rptdt'; });
-    }
-    console.log('Nashville: header cols:', cols.slice(0,6).join(' | '), '| rptdtIdx:', rptdtIdx);
-    if (rptdtIdx < 0) throw new Error('I Rptdt column not found. Header: ' + header.substring(0,200));
+    if (lines.length < 2) throw new Error('Nashville: CSV too short');
+    var header = lines[0].replace(/^\uFEFF/, '');
     var sep = header.includes('\t') ? '\t' : ',';
-    var count = 0, maxDate = null, asof = null;
-    for (var i = 1; i < lines.length; i++) {
-      var parts = lines[i].split(sep);
-      if (parts.length <= rptdtIdx) continue;
-      var rptdt = parts[rptdtIdx].replace(/"/g,'').trim();
-      if (!rptdt) continue;
-      var datePart = rptdt.split(' ')[0];
-      var dp = datePart.split('/');
-      if (dp.length < 3) continue;
-      var rowYr = parseInt(dp[2]);
-      var rowMm = dp[0].padStart(2,'0');
-      var rowDd = dp[1].padStart(2,'0');
-      if (rowYr !== targetYear) continue;
-      if (mmddCutoff && (rowMm + '/' + rowDd) > mmddCutoff) continue;
-      count++;
-      var d = new Date(rowYr, parseInt(dp[0])-1, parseInt(dp[1]));
-      if (!maxDate || d > maxDate) { maxDate = d; asof = rowYr + '-' + rowMm + '-' + rowDd; }
+    var cols = header.split(sep).map(function(c) { return c.replace(/"/g,'').trim(); });
+    console.log('Nashville: CSV cols:', cols.slice(0,5).join(' | '), '| rows:', lines.length - 1);
+    // Row-level: I Rptdt column present — count all rows (date filter applied server-side)
+    if (cols.indexOf('I Rptdt') >= 0) {
+      console.log('Nashville: row-level format, count=' + (lines.length - 1));
+      return lines.length - 1;
     }
-    return { count, asof };
+    // Aggregated: fatal_nonfatal + count column
+    var countIdx = cols.length - 1;
+    var fatalCount = 0, nonfatalCount = 0, allCount = 0;
+    for (var i = 1; i < lines.length; i++) {
+      var parts = lines[i].split(sep).map(function(p) { return p.replace(/"/g,'').trim(); });
+      var label = parts[0].toLowerCase();
+      var val = parseInt(parts[countIdx]);
+      if (isNaN(val)) continue;
+      if (label === 'fatal') fatalCount = val;
+      else if (label === 'non-fatal') nonfatalCount = val;
+      else if (label === 'all') allCount = val;
+    }
+    var total = (fatalCount + nonfatalCount > 0) ? fatalCount + nonfatalCount : allCount;
+    console.log('Nashville: aggregated — fatal=' + fatalCount + ' nonfatal=' + nonfatalCount + ' total=' + total);
+    return total;
   }
 
   const now    = new Date();
   const curYr  = now.getFullYear();
   const priorYr = curYr - 1;
-  const mmdd   = (now.getMonth()+1).toString().padStart(2,'0') + '/' + now.getDate().toString().padStart(2,'0');
 
   // Try direct CSV download with Tableau URL filters
   // "Offense Report Date" filter values: "This year", "Last year"
@@ -1337,17 +1354,18 @@ async function fetchNashville() {
     throw new Error('Nashville: could not obtain CSV data via any method');
   }
 
-  // Parse counts
+  // Parse counts from summary CSV format
   let ytd = null, prior = null, asof = null;
   if (csvCurrent) {
-    const r = countVictims(csvCurrent, curYr, null);
-    ytd = r.count; asof = r.asof;
-    console.log('Nashville: current year victims:', ytd, 'asof:', asof);
+    ytd = parseCSV(csvCurrent);
+    // asof not available in summary format — use today's date as proxy
+    const now2 = new Date();
+    asof = now2.getFullYear() + '-' + (now2.getMonth()+1).toString().padStart(2,'0') + '-' + now2.getDate().toString().padStart(2,'0');
+    console.log('Nashville: current ytd=' + ytd + ' asof=' + asof);
   }
   if (csvPrior) {
-    const r = countVictims(csvPrior, priorYr, mmdd);
-    prior = r.count;
-    console.log('Nashville: prior year victims (to', mmdd + '):', prior);
+    prior = parseCSV(csvPrior);
+    console.log('Nashville: prior=' + prior);
   }
 
   if (ytd === null || prior === null) throw new Error('Nashville: missing data ytd=' + ytd + ' prior=' + prior);
