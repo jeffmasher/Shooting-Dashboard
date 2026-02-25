@@ -241,7 +241,7 @@
   <header>
     <div class="title-block">
       <h1>Shooting <em>Tracker</em></h1>
-      <div class="title-meta">Year-to-Date · Major US Cities · Open Data Portals</div>
+      <div class="title-meta">Year-to-Date</div>
     </div>
     <div class="controls">
       <button class="btn btn-ghost" id="exportBtn" onclick="exportCSV()" disabled>↓ CSV</button>
@@ -251,7 +251,7 @@
 
   <div class="summary">
     <div class="summary-cell">
-      <div class="s-label">Cities Loaded</div>
+      <div class="s-label">Agencies Loaded</div>
       <div class="s-val" id="s-cities">—</div>
       <div class="s-sub">of <span id="total-cities">0</span> tracked</div>
     </div>
@@ -280,7 +280,7 @@
     <table>
       <thead>
         <tr>
-          <th onclick="doSort('name')">City</th>
+          <th onclick="doSort('name')">Agency</th>
           <th class="r sorted" onclick="doSort('ytd')">YTD ↓</th>
           <th class="r" onclick="doSort('prior')">Last YTD</th>
           <th class="r" onclick="doSort('chg')">% Change</th>
@@ -1490,7 +1490,7 @@ function exportJPEG() {
 
   ctx.fillStyle = FT_MID;
   ctx.font = '12px Georgia, serif';
-  ctx.fillText('Selected major US cities · Compared to same period prior year', 24, 74);
+  ctx.fillText('Selected US agencies · Compared to same period prior year', 24, 74);
 
   // Horizontal rule under header
   ctx.strokeStyle = FT_BORDER;
@@ -1575,7 +1575,7 @@ function exportJPEG() {
   ctx.fillStyle = '#0D1B2A';
   ctx.font = 'bold 13px Georgia, serif';
   ctx.textAlign = 'left';
-  ctx.fillText('TOTAL (' + rows.length + ' cities)', colCity, ty);
+  ctx.fillText('TOTAL (' + rows.length + ' agencies)', colCity, ty);
   ctx.textAlign = 'right';
   ctx.fillText(totalYtd.toLocaleString(), colYTD, ty);
   ctx.fillStyle = 'rgba(13,27,42,0.65)';
