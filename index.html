@@ -1145,6 +1145,126 @@ var CITIES = [
       if (auto.hartford && auto.hartford.ok && auto.hartford.asof) return auto.hartford.asof;
       return null;
     }
+  },
+  {
+    id: 'charlotte',
+    name: 'Charlotte, NC',
+    note: 'Non-Fatal Gunshot Injury (CMPD Jurisdiction)',
+    type: 'Non-Fatal',
+    dataUrl: 'https://data.charlottenc.gov/datasets/charlotte::cmpd-violent-crime/explore',
+    _url: 'https://gis.charlottenc.gov/arcgis/rest/services/ODP/ViolentCrimeData/MapServer/0/query',
+    _cache: null,
+    _loadData: async function() {
+      if (this._cache) return this._cache;
+      // Query all Non-Fatal Gunshot Injury rows
+      var where = "CRIME_CATEGORY = 'Non-Fatal Gunshot Injury'";
+      var url = this._url + '?where=' + encodeURIComponent(where) +
+        '&outFields=*&returnGeometry=false&resultRecordCount=2000&f=json';
+      var r = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      var d = await r.json();
+      if (d.error) throw new Error(d.error.message || JSON.stringify(d.error).slice(0, 200));
+      this._cache = d.features || [];
+      // Log field names on first load to help debug
+      if (this._cache.length > 0) {
+        console.log('Charlotte fields:', Object.keys(this._cache[0].attributes));
+        console.log('Charlotte sample:', JSON.stringify(this._cache[0].attributes));
+      }
+      return this._cache;
+    },
+    count: async function(s, e) {
+      var rows = await this._loadData();
+      var year = parseInt(s.slice(0, 4));
+      // Find the max month available for the CURRENT year to ensure fair comparison
+      var maxMonth = 0;
+      rows.forEach(function(f) {
+        var a = f.attributes;
+        var rowType = a.ROW_TYPE || a.Row_Type || a.row_type || a.AREA_TYPE || a.Area_Type || '';
+        if (!/total/i.test(rowType)) return;
+        var ry = a.YEAR || a.Year || a.year || a.CALENDAR_YEAR || null;
+        var rm = a.MONTH || a.Month || a.month || a.CALENDAR_MONTH || null;
+        if (ry == CURRENT_YEAR && rm > maxMonth) maxMonth = rm;
+      });
+      // Sum counts for requested year, only up to the max available month
+      var total = 0, found = false;
+      rows.forEach(function(f) {
+        var a = f.attributes;
+        var rowType = a.ROW_TYPE || a.Row_Type || a.row_type || a.AREA_TYPE || a.Area_Type || '';
+        if (!/total/i.test(rowType)) return;
+        var ry = a.YEAR || a.Year || a.year || a.CALENDAR_YEAR || null;
+        var rm = a.MONTH || a.Month || a.month || a.CALENDAR_MONTH || null;
+        if (ry != year) return;
+        if (maxMonth > 0 && rm > maxMonth) return; // fair comparison
+        var count = a.COUNT_ || a.Count_ || a.OFFENSE_COUNT || a.Offense_Count || a.VALUE_ || a.TOTAL || a.Total || a.COUNT || 0;
+        if (count > 0) { total += count; found = true; }
+      });
+      return found ? total : null;
+    },
+    latest: async function() {
+      var rows = await this._loadData();
+      var latestDate = null;
+      rows.forEach(function(f) {
+        var a = f.attributes;
+        var rowType = a.ROW_TYPE || a.Row_Type || a.row_type || a.AREA_TYPE || a.Area_Type || '';
+        if (!/total/i.test(rowType)) return;
+        // Find the most recent month/year combo
+        var y = a.YEAR || a.Year || a.year || a.CALENDAR_YEAR || null;
+        var m = a.MONTH || a.Month || a.month || a.CALENDAR_MONTH || null;
+        if (y && m) {
+          var d = y + '-' + String(m).padStart(2, '0') + '-01';
+          if (!latestDate || d > latestDate) latestDate = d;
+        }
+      });
+      // Return last day of the latest month
+      if (latestDate) {
+        var parts = latestDate.split('-');
+        var lastDay = new Date(parseInt(parts[0]), parseInt(parts[1]), 0).getDate();
+        return parts[0] + '-' + parts[1] + '-' + String(lastDay).padStart(2, '0');
+      }
+      return null;
+    }
+  },
+  {
+    id: 'denver',
+    name: 'Denver, CO',
+    note: 'Firearm Homicides + Non-Fatal Shooting Victims',
+    type: 'Victims',
+    dataUrl: 'https://www.denvergov.org/Government/Agencies-Departments-Offices/Agencies-Departments-Offices-Directory/Police-Department/Performance-and-Transparency#section-5',
+    count: async function(s, e) {
+      var auto = await loadAutoData();
+      var windowYear = parseInt(s.slice(0,4));
+      if (auto.denver && auto.denver.ok) {
+        var asofYear = auto.denver.asof ? parseInt(auto.denver.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.denver.ytd : auto.denver.prior;
+      }
+      return null;
+    },
+    latest: async function() {
+      var auto = await loadAutoData();
+      if (auto.denver && auto.denver.ok && auto.denver.asof) return auto.denver.asof;
+      return null;
+    }
+  },
+  {
+    id: 'portsmouth',
+    name: 'Portsmouth, VA',
+    note: 'GSW Victims (Non-Fatal + Fatal Non-Suicide)',
+    type: 'Victims',
+    dataUrl: 'https://app.powerbigov.us/view?r=eyJrIjoiZDc3ZmQyYzMtOTgyYi00ODQzLTk4ZWUtZWQyY2ZkODM5ZWNkIiwidCI6ImM3N2RiNGQ4LWEwZjUtNDU0YS05MmMxLWI3ZDg0YzY0ZmQ0NCJ9',
+    count: async function(s, e) {
+      var auto = await loadAutoData();
+      var windowYear = parseInt(s.slice(0,4));
+      if (auto.portsmouth && auto.portsmouth.ok) {
+        var asofYear = auto.portsmouth.asof ? parseInt(auto.portsmouth.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.portsmouth.ytd : auto.portsmouth.prior;
+      }
+      return null;
+    },
+    latest: async function() {
+      var auto = await loadAutoData();
+      if (auto.portsmouth && auto.portsmouth.ok && auto.portsmouth.asof) return auto.portsmouth.asof;
+      return null;
+    }
   }
 ];
 
