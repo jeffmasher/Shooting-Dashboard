@@ -978,85 +978,65 @@ async function fetchOmaha() {
 // extracts text layer to find Shooting Victims row: YTD current + YTD prior year.
 
 async function fetchWilmington() {
-  // The index page is blocked by Akamai for headless browsers.
-  // Strategy: try direct fetchUrl on the index page (sometimes works without UA spoofing),
-  // then try the CivicPlus document API, then scan known doc IDs.
+  // Use Playwright to browse the CompStat page like a real user.
+  // Akamai blocks plain HTTP requests but a real Playwright browser session gets through.
+  // Strategy: navigate to the page, intercept the PDF network response, parse it.
 
-  const listUrl = 'https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports';
-  let html = null;
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+  });
+  const page = await context.newPage();
+  page.setDefaultTimeout(30000);
 
-  // Try 1: plain HTTP fetch (bypasses some bot detectors that target browser TLS fingerprints)
-  console.log('Wilmington: trying direct fetch...');
-  const direct = await fetchUrl(listUrl).catch(() => null);
-  if (direct && direct.status === 200) {
-    html = direct.body.toString('utf8');
-    console.log('Wilmington: direct fetch OK, length:', html.length);
+  const indexUrl = 'https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports';
+  console.log('Wilmington: navigating to CompStat page...');
+  await page.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  await page.waitForTimeout(3000);
+
+  // Find the first link to a CompStat PDF - look for showpublisheddocument hrefs
+  const pdfHref = await page.evaluate(() => {
+    // Look for any link containing showpublisheddocument
+    const links = Array.from(document.querySelectorAll('a[href]'));
+    const pdfLink = links.find(a =>
+      a.href.includes('showpublisheddocument') ||
+      a.href.toLowerCase().includes('compstat') ||
+      (a.innerText || '').toLowerCase().includes('compstat')
+    );
+    if (pdfLink) return pdfLink.href;
+    // Fallback: any link with .pdf extension
+    const pdfExt = links.find(a => a.href.toLowerCase().endsWith('.pdf'));
+    if (pdfExt) return pdfExt.href;
+    return null;
+  });
+
+  console.log('Wilmington: found PDF href:', pdfHref);
+
+  if (!pdfHref) {
+    // Log page content for diagnosis
+    const bodyText = await page.evaluate(() => document.body.innerText.substring(0, 500));
+    const allHrefs = await page.evaluate(() =>
+      Array.from(document.querySelectorAll('a[href]')).slice(0, 20).map(a => a.href)
+    );
+    console.log('Wilmington: page body:', bodyText);
+    console.log('Wilmington: all hrefs:', JSON.stringify(allHrefs));
+    await browser.close();
+    throw new Error('Wilmington: no PDF link found on CompStat page');
   }
 
-  // Try 2: CivicPlus document list partial URL
-  if (!html) {
-    for (const apiPath of [
-      '/Home/Components/DocumentList/DocumentList/211/30',
-      '/government/public-safety/wilmington-police-department/compstat-reports?format=rss',
-    ]) {
-      const apiResp = await fetchUrl('https://www.wilmingtonde.gov' + apiPath).catch(() => null);
-      if (apiResp && apiResp.status === 200) {
-        html = apiResp.body.toString('utf8');
-        console.log('Wilmington: API fetch OK at', apiPath, 'length:', html.length);
-        break;
-      }
-    }
+  // Download the PDF by intercepting the response
+  console.log('Wilmington: downloading PDF from', pdfHref);
+  const pdfResp = await page.request.get(pdfHref);
+  const pdfBuf = Buffer.from(await pdfResp.body());
+  await browser.close();
+
+  console.log('Wilmington: PDF bytes:', pdfBuf.length, 'magic:', pdfBuf.slice(0,4).toString('hex'));
+  if (pdfBuf[0] !== 0x25 || pdfBuf[1] !== 0x50) {
+    throw new Error('Wilmington: downloaded file is not a PDF. Preview: ' + pdfBuf.toString('utf8', 0, 200));
   }
 
-  // Try to find PDF path from HTML if we got any
-  let pdfPath = null;
-  if (html && html.includes('showpublisheddocument')) {
-    // Anchor text contains "CompStat"
-    const anchorMatch = html.match(/href="(\/home\/showpublisheddocument\/[^"]+)"[^>]*>[^<]*[Cc]omp[Ss]tat[^<]*/i);
-    if (anchorMatch) { pdfPath = anchorMatch[1]; console.log('Wilmington: PDF via anchor:', pdfPath); }
-
-    // Any showpublisheddocument link, highest ID = most recent
-    if (!pdfPath) {
-      const allLinks = [...html.matchAll(/href="(\/home\/showpublisheddocument\/(\d+)\/[^"]+)"/gi)];
-      if (allLinks.length > 0) {
-        allLinks.sort((a, b) => parseInt(b[2]) - parseInt(a[2]));
-        pdfPath = allLinks[0][1];
-        console.log('Wilmington: PDF via highest doc ID in HTML:', pdfPath);
-      }
-    }
-  }
-
-  // If we found a path, fetch and parse it
-  if (pdfPath) {
-    const pdfUrl = 'https://www.wilmingtonde.gov' + pdfPath;
-    console.log('Wilmington: fetching PDF:', pdfUrl);
-    const pdfResp = await fetchUrl(pdfUrl);
-    if (pdfResp.status === 200) return await parseWilmingtonPdf(pdfResp.body, pdfUrl);
-    console.log('Wilmington: PDF fetch returned', pdfResp.status);
-  }
-
-  // Fallback: scan doc IDs near the known working one (8310 = week of 2026-02-19)
-  // CivicPlus showpublisheddocument/{id} without ticks should redirect to latest version.
-  // Try both with and without following redirects.
-  console.log('Wilmington: scanning doc IDs...');
-  // Scan wider range: 8310 +/- 20
-  const scanIds = [];
-  for (let id = 8330; id >= 8290; id--) scanIds.push(id);
-
-  for (const docId of scanIds) {
-    // Try showpublisheddocument without ticks (CivicPlus canonical URL)
-    const url1 = 'https://www.wilmingtonde.gov/home/showpublisheddocument/' + docId;
-    const r1 = await fetchUrl(url1, 10000).catch(() => null);
-    if (r1) {
-      console.log('Wilmington: docId', docId, 'status:', r1.status, 'bytes:', r1.body.length, 'magic:', r1.body.slice(0,4).toString('hex'));
-      if (r1.status === 200 && r1.body[0] === 0x25 && r1.body[1] === 0x50) {
-        console.log('Wilmington: found PDF at', url1);
-        return await parseWilmingtonPdf(r1.body, url1);
-      }
-    }
-  }
-
-  throw new Error('Wilmington: could not find PDF via index page or doc ID scan (tried 8290-8330)');
+  return await parseWilmingtonPdf(pdfBuf, pdfHref);
 }
 
 async function parseWilmingtonPdf(pdfBuf, sourceUrl) {
@@ -1366,12 +1346,20 @@ async function fetchNashville() {
   // Step 3: Hit the CSV export endpoint directly
   // Tableau Server CSV export: /t/{site}/views/{workbook}/{sheet}.csv
   // :refresh=y forces a fresh query; :format=csv is implicit with .csv extension
-  // Try multiple CSV endpoint patterns — Tableau sheet name may vary
+  // Try multiple CSV endpoint patterns to find the row-level incident sheet
+  // We need row-level data (with date column) so we can count YTD for prior year
+  // GunshotInjuries.csv returns a summary without dates — not useful for prior YTD
   const csvPaths = [
+    // Crosstab endpoint (what the toolbar Download->Crosstab actually hits)
+    '/t/Police/views/GunshotInjury/Map/crosstab?:format=csv&:embed=y&:showVizHome=no',
+    // Various plausible row-level sheet names
+    '/t/Police/views/GunshotInjury/Incidents.csv?:embed=y&:showVizHome=no',
+    '/t/Police/views/GunshotInjury/Data.csv?:embed=y&:showVizHome=no',
+    '/t/Police/views/GunshotInjury/Details.csv?:embed=y&:showVizHome=no',
+    '/t/Police/views/GunshotInjury/Sheet1.csv?:embed=y&:showVizHome=no',
+    // Map with crosstab param
+    '/t/Police/views/GunshotInjury/Map.csv?:embed=y&:showVizHome=no&:format=csv',
     '/t/Police/views/GunshotInjury/Map.csv?:embed=y&:showVizHome=no',
-    '/t/Police/views/GunshotInjury/GunshotInjuries.csv?:embed=y&:showVizHome=no',
-    '/t/Police/views/GunshotInjury/GunshotInjuriesMap.csv?:embed=y&:showVizHome=no',
-    '/t/Police/views/GunshotInjury/Map.csv?:refresh=y&:embed=y',
   ];
 
   let csvResp = null;
@@ -1400,13 +1388,17 @@ async function fetchNashville() {
     });
     console.log('Nashville: status', resp.status, 'for', csvPath);
     if (resp.status === 200) {
-      const preview = resp.body.toString('utf8').substring(0, 100);
-      if (preview.includes(',') || preview.includes('\t')) {
+      const preview = resp.body.toString('utf8').substring(0, 400);
+      const hasDateCol = preview.includes('Rptdt') || preview.includes('Date') || preview.includes('/20');
+      const isSummary = preview.includes('fatal_nonfatal') || preview.includes('Measure Names');
+      console.log('Nashville: preview:', preview.substring(0, 120));
+      if ((preview.includes(',') || preview.includes('\t')) && hasDateCol && !isSummary) {
         csvResp = resp;
-        console.log('Nashville: found working CSV at', csvPath);
+        console.log('Nashville: found row-level CSV at', csvPath);
         break;
       }
-      console.log('Nashville: 200 but not CSV, preview:', preview.substring(0,80));
+      if (isSummary) console.log('Nashville: skipping summary CSV at', csvPath);
+      else if (!hasDateCol) console.log('Nashville: no date column at', csvPath);
     }
   }
 
@@ -1418,10 +1410,10 @@ async function fetchNashville() {
 
   const buf = csvResp.body;
   const csvData = (buf[0] === 0xFF && buf[1] === 0xFE) ? buf.toString('utf16le') : buf.toString('utf8');
-  console.log('Nashville: CSV bytes:', buf.length, 'preview:', csvData.substring(0, 200));
+  console.log('Nashville: CSV bytes:', buf.length, 'preview:', csvData.substring(0, 300));
 
   if (!csvData.includes('I Rptdt')) {
-    throw new Error('Nashville: wrong CSV format (no I Rptdt column). Preview: ' + csvData.substring(0, 200));
+    throw new Error('Nashville: unrecognized CSV format (no I Rptdt column). Preview: ' + csvData.substring(0, 200));
   }
 
   // Step 4: Count victims by year
