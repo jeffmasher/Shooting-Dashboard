@@ -1390,8 +1390,10 @@ function render() {
     var manualBtn = city.manual ? ' <button class="manual-btn" onclick="openManual(\'' + city.id + '\')" title="Edit">✎ Edit</button>' : '';
     var srcUrl = city.dataUrl || city._pdfUrl || city._csvUrl || city._url || (city._datasets ? city._datasets[Object.keys(city._datasets)[0]] : null);
     var sourceLink = srcUrl ? '<a class="manual-btn" href="' + srcUrl + '" target="_blank" title="Open source">Source</a>' : '—';
+    var zeroWarn = (s.ytd === 0 && (s.prior === 0 || s.prior == null)) ? '<div class="city-note" style="color:var(--yellow)">⚠ 0 for both years — possible data source error</div>' : '';
+    var dotClass = zeroWarn ? 'dot-loading' : 'dot-ok';
     return divider + '<tr' + (city.manual ? ' class="manual-row"' : '') + '>' +
-      '<td><div class="city-name"><span class="dot dot-ok"></span>' + city.name + manualBtn + '</div>' + (city.noteHtml ? '<div class="city-note">' + city.noteHtml + '</div>' : '') + '</td>' +
+      '<td><div class="city-name"><span class="dot ' + dotClass + '"></span>' + city.name + manualBtn + '</div>' + zeroWarn + (city.noteHtml ? '<div class="city-note">' + city.noteHtml + '</div>' : '') + '</td>' +
       '<td class="num">' + (s.ytd != null ? s.ytd.toLocaleString() : '—') + '</td>' +
       '<td class="num" style="color:var(--muted2)">' + (s.prior != null ? s.prior.toLocaleString() : '—') + '</td>' +
       '<td class="chg">' + chgHtml + '</td>' +
