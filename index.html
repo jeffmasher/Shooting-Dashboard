@@ -103,7 +103,7 @@
   .s-sub { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); margin-top: 4px; }
 
   /* ── Table card ── */
-  .table-card { background: var(--surface); border: 1px solid var(--border); }
+  .table-card { background: var(--surface); border: 1px solid var(--border); overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .table-top {
     display: flex; align-items: center; justify-content: space-between;
     padding: 12px 20px; border-bottom: 2px solid var(--rule);
@@ -111,22 +111,23 @@
   .table-label { font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
   .fetch-status { font-family: 'IBM Plex Mono', monospace; font-size: 10px; color: var(--muted); }
 
-  table { width: 100%; border-collapse: collapse; }
+  table { width: 100%; border-collapse: collapse; table-layout: auto; }
   thead th {
-    padding: 10px 20px;
+    padding: 10px 14px;
     font-family: 'IBM Plex Mono', monospace; font-size: 9px; letter-spacing: 1.5px;
     text-transform: uppercase; color: var(--muted); text-align: left;
     border-bottom: 1px solid var(--border); white-space: nowrap;
     cursor: pointer; user-select: none;
     background: var(--surface2);
   }
+  thead th:first-child { width: 22%; }
   thead th:hover { color: var(--text); }
   thead th.sorted { color: var(--text); font-weight: 600; }
   thead th.r { text-align: right; }
   tbody tr { border-bottom: 1px solid var(--border); transition: background 0.08s; }
   tbody tr:last-child { border-bottom: none; }
   tbody tr:hover { background: #f7f7f5; }
-  td { padding: 13px 20px; vertical-align: middle; }
+  td { padding: 13px 14px; vertical-align: middle; }
 
   .city-name { font-family: 'Source Serif 4', Georgia, serif; font-size: 15px; font-weight: 600; color: var(--text); white-space: nowrap; }
   .city-note { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: var(--muted); margin-top: 3px; }
@@ -234,8 +235,7 @@
 
   /* ── Mobile: small screens ── */
   @media (max-width: 600px) {
-    /* Horizontal scroll wrapper for table */
-    .table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    /* Table already scrolls via .table-card overflow-x */
     table { min-width: 560px; }
     td, thead th { padding: 10px 10px; }
     .city-name { font-size: 13.5px; }
