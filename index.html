@@ -256,9 +256,6 @@
       <select class="year-select" id="yearSel" onchange="onYearChange()">
         <option value="2026">2026</option>
         <option value="2025">2025</option>
-        <option value="2024">2024</option>
-        <option value="2023">2023</option>
-        <option value="2022">2022</option>
       </select>
       <button class="btn btn-ghost" id="exportBtn" onclick="exportCSV()" disabled>↓ CSV</button>
       <button class="btn btn-ghost" id="jpegBtn" onclick="exportJPEG()" disabled>↓ JPEG</button>
@@ -549,16 +546,22 @@ var CITIES = [
   {
     id: 'nashville',
     name: 'Nashville, TN',
-    note: 'Gunshot Injuries (Manual)',
+    note: 'Gunshot Victims (MNPD Crime Initiative Book)',
     type: 'Victims',
-    manual: true,
-    dataUrl: 'https://www.nashville.gov/departments/police/data-dashboard/gunshot-injuries-map',
+    dataUrl: 'https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public/Shared%20Documents/Forms/AllItems.aspx?id=%2Fsites%2FMNPDCrimeAnalysis%2DPublic%2FShared%20Documents%2FWeekly%20Crime%20%2D%20Initiative%20Book&p=true&ga=1',
     count: async function(s, e) {
-      var key = 'manual_' + this.id + '_' + s.slice(0,4);
-      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
+      var auto = await loadAutoData();
+      var windowYear = parseInt(s.slice(0,4));
+      if (auto.nashville && auto.nashville.ok) {
+        var asofYear = auto.nashville.asof ? parseInt(auto.nashville.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.nashville.ytd : auto.nashville.prior;
+      }
+      return null;
     },
     latest: async function() {
-      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+      var auto = await loadAutoData();
+      if (auto.nashville && auto.nashville.ok && auto.nashville.asof) return auto.nashville.asof;
+      return null;
     }
   },
   {
@@ -1149,6 +1152,27 @@ var CITIES = [
     },
     latest: async function() {
       try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
+    }
+  },
+  {
+    id: 'hartford',
+    name: 'Hartford, CT',
+    note: 'Non-Fatal Shooting Victims (HPD CompStat)',
+    type: 'Victims',
+    dataUrl: 'https://www.hartfordct.gov/Government/Departments/HPD/HPD-Community-Info/CompStat',
+    count: async function(s, e) {
+      var auto = await loadAutoData();
+      var windowYear = parseInt(s.slice(0,4));
+      if (auto.hartford && auto.hartford.ok) {
+        var asofYear = auto.hartford.asof ? parseInt(auto.hartford.asof.slice(0,4)) : CURRENT_YEAR;
+        return windowYear === asofYear ? auto.hartford.ytd : auto.hartford.prior;
+      }
+      return null;
+    },
+    latest: async function() {
+      var auto = await loadAutoData();
+      if (auto.hartford && auto.hartford.ok && auto.hartford.asof) return auto.hartford.asof;
+      return null;
     }
   }
 ];
