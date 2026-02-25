@@ -1247,40 +1247,10 @@ async function fetchDenver() {
   await page.setViewportSize({ width: 1536, height: 900 });
   page.setDefaultTimeout(30000);
 
-  // Load the wrapper page
-  const url = 'https://www.denvergov.org/Government/Agencies-Departments-Offices/Agencies-Departments-Offices-Directory/Police-Department/Performance-and-Transparency#section-5';
-  console.log('Denver: loading wrapper page...');
+  // Load the Power BI embed directly
+  const url = 'https://app.powerbigov.us/view?r=eyJrIjoiOWMwZjg0MGYtODI0ZC00ZGVjLThmNjEtMzExZDI3OGUzYzQyIiwidCI6IjM5Yzg3YWIzLTY2MTItNDJjMC05NjIwLWE2OTZkMTJkZjgwMyJ9';
+  console.log('Denver: loading Power BI embed directly...');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(10000);
-
-  // Find the Power BI iframe (homicide/shooting dashboard)
-  const iframeSrc = await page.evaluate(() => {
-    const frames = Array.from(document.querySelectorAll('iframe'));
-    const pbi = frames.find(f => f.src && (f.src.includes('powerbi') || f.src.includes('app.powerbigov')));
-    return pbi ? pbi.src : null;
-  });
-  console.log('Denver iframe src:', iframeSrc);
-
-  if (!iframeSrc) {
-    // Try scrolling down to trigger lazy-loaded iframes
-    await page.evaluate(() => window.scrollBy(0, 3000));
-    await page.waitForTimeout(5000);
-    const iframeSrc2 = await page.evaluate(() => {
-      const frames = Array.from(document.querySelectorAll('iframe'));
-      const pbi = frames.find(f => f.src && (f.src.includes('powerbi') || f.src.includes('app.powerbigov')));
-      return pbi ? pbi.src : null;
-    });
-    if (!iframeSrc2) {
-      const src = await page.content();
-      console.log('Denver page source snippet:', src.substring(0, 3000));
-      await browser.close();
-      throw new Error('Could not find Power BI iframe on Denver page');
-    }
-    console.log('Denver iframe src (after scroll):', iframeSrc2);
-    await page.goto(iframeSrc2, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  } else {
-    await page.goto(iframeSrc, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  }
 
   await page.waitForTimeout(15000);
   const page1Text = await page.evaluate(() => document.body.innerText);
@@ -1434,19 +1404,21 @@ async function fetchPortsmouth() {
   const yr = new Date().getFullYear();
 
   const promptText = [
-    'This is a Portsmouth Police Power BI dashboard showing "GSW Victims – Injuries/Death & Rate (YTD)".',
-    'It has a bar chart with years on the x-axis. Each year has stacked bars:',
-    '  - Yellow bars = Non-Fatal gunshot victims',
-    '  - Red bars = Fatal (Non-Suicide) gunshot victims',
-    '  - The number at the top of each year\'s bars = Total Gunshot Victims',
-    'I need the TOTAL Gunshot Victims (the number shown at the top of each bar group) for ' + yr + ' and ' + (yr-1) + '.',
-    'Also look for any "Last Updated" or date indicator.',
-    'Reply ONLY in this format: YTD=N PRIOR=N ASOF=YYYY-MM-DD',
-    'If you cannot find a date, omit ASOF. Use the total numbers shown at the top of each year\'s bars.'
-  ].join(' ');
+    'This is a bar chart titled "GSW Victims – Injuries/Death & Rate (YTD)" from Portsmouth Police.',
+    'It shows grouped bars for each year. For each year there are numbers displayed above/on each bar:',
+    '  - A dashed orange number at the very top = Total Gunshot Victims',
+    '  - A yellow bar with a number = Non-Fatal victims',
+    '  - A red bar with a number = Fatal (Non-Suicide) victims', 
+    '  - A small purple bar with a number = Fatal (Suicide) victims',
+    'Read the numbers for the two rightmost years: ' + yr + ' and ' + (yr-1) + '.',
+    'For EACH year, tell me the Non-Fatal (yellow) number and the Fatal Non-Suicide (red) number.',
+    'Reply ONLY in this exact format:',
+    yr + '_NONFATAL=N ' + yr + '_FATAL=N ' + (yr-1) + '_NONFATAL=N ' + (yr-1) + '_FATAL=N',
+    'Read carefully - the red numbers can be small and hard to see against the dark background.'
+  ].join('\n');
 
   const body = JSON.stringify({
-    model: 'claude-haiku-4-5-20251001',
+    model: 'claude-sonnet-4-5-20250929',
     max_tokens: 128,
     messages: [{ role: 'user', content: [
       { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
@@ -1470,7 +1442,7 @@ async function fetchPortsmouth() {
   console.log('Portsmouth vision response:', visionText);
 
   // Retry if empty
-  for (let retry = 1; retry <= 2 && !visionText.includes('YTD='); retry++) {
+  for (let retry = 1; retry <= 2 && !visionText.includes('NONFATAL='); retry++) {
     console.log('Portsmouth: retrying vision call attempt ' + retry + '...');
     await new Promise(r => setTimeout(r, 3000));
     const resp2 = await new Promise((resolve, reject) => {
@@ -1488,13 +1460,16 @@ async function fetchPortsmouth() {
     console.log('Portsmouth vision retry ' + retry + ' response:', visionText);
   }
 
-  const ytdV = visionText.match(/YTD=(\d+)/);
-  const priorV = visionText.match(/PRIOR=(\d+)/);
-  const asofV = visionText.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
+  const ytdNF = visionText.match(new RegExp(yr + '_NONFATAL=(\\d+)'));
+  const ytdF  = visionText.match(new RegExp(yr + '_FATAL=(\\d+)'));
+  const prNF  = visionText.match(new RegExp((yr-1) + '_NONFATAL=(\\d+)'));
+  const prF   = visionText.match(new RegExp((yr-1) + '_FATAL=(\\d+)'));
 
-  const ytd = ytdV ? parseInt(ytdV[1]) : null;
-  const prior = priorV ? parseInt(priorV[1]) : null;
-  if (asofV && !asof) asof = asofV[1];
+  console.log('Portsmouth parsed: ' + yr + ' NF=' + (ytdNF?.[1]||'?') + ' F=' + (ytdF?.[1]||'?') +
+    ' | ' + (yr-1) + ' NF=' + (prNF?.[1]||'?') + ' F=' + (prF?.[1]||'?'));
+
+  const ytd = (ytdNF && ytdF) ? parseInt(ytdNF[1]) + parseInt(ytdF[1]) : null;
+  const prior = (prNF && prF) ? parseInt(prNF[1]) + parseInt(prF[1]) : null;
 
   console.log('Portsmouth final: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
   if (ytd === null || prior === null) throw new Error('Portsmouth: vision parse failed: ' + visionText);
