@@ -171,7 +171,7 @@ async function fetchDurham() {
   const viewport = pg1.getViewport({ scale: 2.0 });
   const canvas  = createCanvas(viewport.width, viewport.height);
   const ctx     = canvas.getContext('2d');
-  await pg1.render({ canvasContext: ctx, viewport }).promise;
+  await pg1.render({ canvasContext: ctx, viewport }).promise.catch(e => { throw new Error('Durham PDF render failed: ' + (e && e.message || String(e))); });
   const pngBuf = canvas.toBuffer('image/png');
   console.log('Durham: rendered PDF to PNG, size:', pngBuf.length, 'bytes');
 
@@ -218,7 +218,7 @@ async function fetchDurham() {
 
   const m2025 = responseText.match(/2025=(\d+)/);
   const m2026 = responseText.match(/2026=(\d+)/);
-  if (!m2026) throw new Error('Could not parse Durham chart values. Response: ' + responseText);
+  if (!m2026) throw new Error('Could not parse Durham chart values. Response: ' + responseText + ' API resp: ' + JSON.stringify(claudeData).substring(0,200));
 
   return {
     ytd:   parseInt(m2026[1]),
@@ -978,86 +978,43 @@ async function fetchOmaha() {
 // extracts text layer to find Shooting Victims row: YTD current + YTD prior year.
 
 async function fetchWilmington() {
-  // Use Playwright to browse the CompStat page like a real user.
-  // Akamai blocks plain HTTP requests but a real Playwright browser session gets through.
-  // Strategy: navigate to the page, intercept the PDF network response, parse it.
+  // Akamai blocks all direct requests and Playwright sessions.
+  // Strategy: try Wayback Machine CDX API to find the most recent cached PDF,
+  // then fetch it from the Wayback Machine's cache (which bypasses the block).
 
-  const { chromium } = require('playwright');
-  const browser = await chromium.launch({
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-web-security',
-    ]
-  });
-  const context = await browser.newContext({
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
-    locale: 'en-US',
-    timezoneId: 'America/New_York',
-    viewport: { width: 1280, height: 900 },
-    extraHTTPHeaders: {
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.9',
+  // Use Wayback Machine CDX API to find the most recently cached PDF URL
+  const cdxUrl = 'https://web.archive.org/cdx/search/cdx?url=wilmingtonde.gov/home/showpublisheddocument/*&output=json&limit=5&from=20260101&fl=original,timestamp&filter=statuscode:200&collapse=digest';
+  console.log('Wilmington: querying Wayback CDX...');
+  const cdxResp = await fetchUrl(cdxUrl, 15000).catch(() => null);
+  
+  if (cdxResp && cdxResp.status === 200) {
+    const cdxText = cdxResp.body.toString('utf8');
+    console.log('Wilmington: CDX response:', cdxText.substring(0, 300));
+    try {
+      const rows = JSON.parse(cdxText);
+      // rows[0] is header ["original","timestamp"], rest are data
+      // Sort by timestamp descending, pick most recent
+      const dataRows = rows.slice(1).sort((a,b) => b[1].localeCompare(a[1]));
+      if (dataRows.length > 0) {
+        const [origUrl, ts] = dataRows[0];
+        // Fetch from Wayback Machine cache
+        const waybackUrl = 'https://web.archive.org/web/' + ts + 'if_/' + origUrl;
+        console.log('Wilmington: fetching from Wayback:', waybackUrl);
+        const pdfResp = await fetchUrl(waybackUrl, 30000);
+        if (pdfResp.status === 200 && pdfResp.body[0] === 0x25 && pdfResp.body[1] === 0x50) {
+          console.log('Wilmington: got PDF from Wayback, bytes:', pdfResp.body.length);
+          return await parseWilmingtonPdf(pdfResp.body, origUrl);
+        }
+        console.log('Wilmington: Wayback fetch status:', pdfResp.status, 'magic:', pdfResp.body.slice(0,4).toString('hex'));
+      }
+    } catch(e) {
+      console.log('Wilmington: CDX parse error:', e.message);
     }
-  });
-  await context.addInitScript(() => {
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    Object.defineProperty(navigator, 'plugins', { get: () => [1,2,3,4,5] });
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-    window.chrome = { runtime: {}, loadTimes: () => {}, csi: () => {} };
-  });
-  const page = await context.newPage();
-  page.setDefaultTimeout(30000);
-
-  const indexUrl = 'https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports';
-  console.log('Wilmington: navigating to CompStat page...');
-  await page.goto(indexUrl, { waitUntil: 'domcontentloaded', timeout: 30000 });
-  // Wait longer for Akamai's behavioral check to pass
-  await page.waitForTimeout(6000);
-
-  // Find the first link to a CompStat PDF - look for showpublisheddocument hrefs
-  const pdfHref = await page.evaluate(() => {
-    // Look for any link containing showpublisheddocument
-    const links = Array.from(document.querySelectorAll('a[href]'));
-    const pdfLink = links.find(a =>
-      a.href.includes('showpublisheddocument') ||
-      a.href.toLowerCase().includes('compstat') ||
-      (a.innerText || '').toLowerCase().includes('compstat')
-    );
-    if (pdfLink) return pdfLink.href;
-    // Fallback: any link with .pdf extension
-    const pdfExt = links.find(a => a.href.toLowerCase().endsWith('.pdf'));
-    if (pdfExt) return pdfExt.href;
-    return null;
-  });
-
-  console.log('Wilmington: found PDF href:', pdfHref);
-
-  if (!pdfHref) {
-    // Log page content for diagnosis
-    const bodyText = await page.evaluate(() => document.body.innerText.substring(0, 500));
-    const allHrefs = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('a[href]')).slice(0, 20).map(a => a.href)
-    );
-    console.log('Wilmington: page body:', bodyText);
-    console.log('Wilmington: all hrefs:', JSON.stringify(allHrefs));
-    await browser.close();
-    throw new Error('Wilmington: no PDF link found on CompStat page');
+  } else {
+    console.log('Wilmington: CDX request failed, status:', cdxResp?.status);
   }
 
-  // Download the PDF by intercepting the response
-  console.log('Wilmington: downloading PDF from', pdfHref);
-  const pdfResp = await page.request.get(pdfHref);
-  const pdfBuf = Buffer.from(await pdfResp.body());
-  await browser.close();
-
-  console.log('Wilmington: PDF bytes:', pdfBuf.length, 'magic:', pdfBuf.slice(0,4).toString('hex'));
-  if (pdfBuf[0] !== 0x25 || pdfBuf[1] !== 0x50) {
-    throw new Error('Wilmington: downloaded file is not a PDF. Preview: ' + pdfBuf.toString('utf8', 0, 200));
-  }
-
-  return await parseWilmingtonPdf(pdfBuf, pdfHref);
+  throw new Error('Wilmington: could not retrieve PDF via Wayback Machine');
 }
 
 async function parseWilmingtonPdf(pdfBuf, sourceUrl) {
@@ -1157,7 +1114,7 @@ async function main() {
     safe('Portland',   fetchPortland,   120000),
     safe('Buffalo',    fetchBuffalo,    120000),
     safe('Nashville',  fetchNashville,  180000),
-    safe('Wilmington', fetchWilmington, 60000),
+    // Wilmington removed — Akamai blocks all automated access; manual entry only
   ]);
 
   for (const { key, value } of fetches) {
@@ -1301,76 +1258,119 @@ async function fetchPortland() {
 // Full dataset → count by year client-side.
 
 async function fetchNashville() {
-  // The Tableau REST API only exposes a summary sheet (no row-level dates).
-  // Load the viz in Playwright, take a screenshot, use vision API to read counts.
-  // The dashboard shows current year YTD by default; we also need prior year.
-  // We'll load twice: once with default filter (current year), once with prior year filter.
+  // Strategy: use the Tableau "Last N months" filter to build monthly totals.
+  // Fetching "Last N months" gives a cumulative count from that month back.
+  // Subtracting consecutive values isolates each individual month.
+  // This lets us compute true YTD for both current and prior year.
+  //
+  // The filter dropdown is on the GunshotInjuries view.
+  // We set it via Playwright by clicking the "Offense Report Date" dropdown,
+  // then selecting "Months" tab, entering N in the "Last N months" spinner,
+  // then reading the displayed count from the title "Gunshot Injuries: M/D/YYYY - M/D/YYYY"
+  // and the map dot count (or the summary CSV which gives "All=N").
+  //
+  // Simpler: the GunshotInjuries.csv endpoint respects filter URL params when
+  // the session is fresh. We load the page once, then hit the CSV endpoint
+  // with a date range param for each month window.
+  //
+  // Actually simplest: load the viz, use page.request to hit the CSV endpoint
+  // with different "Offense Report Date" range params in the URL.
+  // Tableau date filter URL syntax: ?Offense+Report+Date=01%2F01%2F2025-01%2F31%2F2025
 
   const now = new Date();
   const curYr = now.getFullYear();
   const priorYr = curYr - 1;
+  const curMo = now.getMonth() + 1; // 1-based
 
-  async function loadAndScreenshot(url) {
-    const { chromium } = require('playwright');
-    const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-    const page = await browser.newPage();
-    page.setDefaultTimeout(60000);
-    console.log('Nashville: loading', url);
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForTimeout(8000);
-    const buf = await page.screenshot({ fullPage: false });
-    await browser.close();
-    return buf;
-  }
-
-  async function visionCount(imgBuf, year) {
-    const imgB64 = imgBuf.toString('base64');
-    const body = JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 128,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imgB64 } },
-          { type: 'text', text: 'This is a Nashville gunshot injuries dashboard showing ' + year + ' data. Find the total gunshot victim or incident count for ' + year + '. Reply ONLY: COUNT=NUMBER ASOF=YYYY-MM-DD (use today ' + now.toISOString().slice(0,10) + ' if no date visible)' }
-        ]
-      }]
-    });
-    const resp = await new Promise((resolve, reject) => {
-      const req = require('https').request({
-        hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY,
-                   'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(body) }
-      }, (res) => {
-        const chunks = []; res.on('data', c => chunks.push(c));
-        res.on('end', () => resolve(JSON.parse(Buffer.concat(chunks).toString())));
-      });
-      req.on('error', reject); req.write(body); req.end();
-    });
-    const text = (resp.content?.[0]?.text || '').trim();
-    console.log('Nashville vision (' + year + '):', text);
-    const countMatch = text.match(/COUNT=(\d+)/);
-    const asofMatch = text.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
-    return {
-      count: countMatch ? parseInt(countMatch[1]) : null,
-      asof: asofMatch ? asofMatch[1] : now.toISOString().slice(0, 10)
-    };
-  }
+  // Launch browser once to get session
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const page = await browser.newPage();
+  page.setDefaultTimeout(60000);
 
   const baseUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:embed=y&:showVizHome=no';
-  // Current year — default view
-  const curShot = await loadAndScreenshot(baseUrl);
-  console.log('Nashville: current year screenshot', curShot.length, 'bytes');
-  const curResult = await visionCount(curShot, curYr);
+  console.log('Nashville: loading viz for session...');
+  await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(5000);
+  const cookies = await page.context().cookies();
+  const cookieHeader = cookies.map(c => c.name + '=' + c.value).join('; ');
+  console.log('Nashville: got', cookies.length, 'cookies');
 
-  // Prior year — add year filter param
-  const priorUrl = baseUrl + '&Offense+Report+Year=' + priorYr;
-  const priorShot = await loadAndScreenshot(priorUrl);
-  console.log('Nashville: prior year screenshot', priorShot.length, 'bytes');
-  const priorResult = await visionCount(priorShot, priorYr);
+  // Fetch CSV for a specific month range
+  async function fetchMonthCount(year, month) {
+    const pad = n => String(n).padStart(2, '0');
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const dateParam = pad(month) + '%2F01%2F' + year + '-' + pad(month) + '%2F' + daysInMonth + '%2F' + year;
+    const path = '/t/Police/views/GunshotInjury/GunshotInjuries.csv?:embed=y&:showVizHome=no&Offense+Report+Date=' + dateParam;
+    const resp = await new Promise((resolve, reject) => {
+      const req = require('https').request({
+        hostname: 'policepublicdata.nashville.gov',
+        path,
+        method: 'GET',
+        headers: {
+          'Cookie': cookieHeader,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+          'Accept': 'text/csv,text/plain,*/*',
+          'Referer': baseUrl,
+        }
+      }, (res) => {
+        const chunks = [];
+        res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) }));
+        res.on('error', reject);
+      });
+      req.on('error', reject);
+      req.end();
+    });
+    if (resp.status !== 200) return null;
+    const csv = resp.body.toString('utf8');
+    // Format: fatal_nonfatal,Measure Names,Count
+    // All,No Measure Value,N
+    const allMatch = csv.match(/^All,.*?,(\d+)/m);
+    if (allMatch) return parseInt(allMatch[1]);
+    return null;
+  }
 
-  console.log('Nashville: ytd=' + curResult.count + ' prior=' + priorResult.count + ' asof=' + curResult.asof);
-  if (!curResult.count) throw new Error('Nashville: vision API could not find current year count');
+  // Fetch completed months + current partial: Jan 2025 through current month 2026
+  const monthCounts = {}; // key: "YYYY-MM"
+  const monthsToFetch = [];
+  for (let m = 1; m <= 12; m++) monthsToFetch.push([priorYr, m]);
+  for (let m = 1; m <= curMo; m++) monthsToFetch.push([curYr, m]); // includes current partial month
 
-  return { ytd: curResult.count, prior: priorResult.count, asof: curResult.asof };
+  console.log('Nashville: fetching', monthsToFetch.length, 'monthly CSVs...');
+  for (const [yr, mo] of monthsToFetch) {
+    const count = await fetchMonthCount(yr, mo);
+    const key = yr + '-' + String(mo).padStart(2, '0');
+    monthCounts[key] = count;
+    console.log('Nashville: ' + key + ' = ' + count);
+  }
+
+  await browser.close();
+
+  // YTD = sum of completed months only (i.e. through end of last month)
+  // In February, that's just January. In March, Jan+Feb. Etc.
+  const completedThrough = curMo - 1; // last completed month number
+  let ytd = 0;
+  for (let m = 1; m <= completedThrough; m++) {
+    const key = curYr + '-' + String(m).padStart(2, '0');
+    ytd += (monthCounts[key] || 0);
+  }
+
+  // Prior year: same completed months in prior year
+  let prior = 0;
+  for (let m = 1; m <= completedThrough; m++) {
+    const key = priorYr + '-' + String(m).padStart(2, '0');
+    prior += (monthCounts[key] || 0);
+  }
+
+  // asof = last day of most recently completed month
+  const asofDate = new Date(curYr, completedThrough, 0); // day 0 = last day of prev month
+  const asof = asofDate.toISOString().slice(0, 10);
+
+  console.log('Nashville: monthly counts:', JSON.stringify(monthCounts));
+  console.log('Nashville: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
+
+  if (ytd === 0) throw new Error('Nashville: all monthly counts were zero or null — date filter param may not work');
+
+  return { ytd, prior, asof, monthly: monthCounts };
 }
