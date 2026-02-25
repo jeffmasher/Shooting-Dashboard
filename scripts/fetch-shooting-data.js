@@ -972,6 +972,124 @@ async function fetchOmaha() {
 }
 
 
+// ─── Wilmington (PDF - WPD CompStat Report) ───────────────────────────────────
+// Index page: https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports
+// Scrapes the index for the latest "WPD CompStat Report" PDF link, downloads it,
+// extracts text layer to find Shooting Victims row: YTD current + YTD prior year.
+
+async function fetchWilmington() {
+  const indexUrl = 'https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports';
+  console.log('Wilmington: fetching index page...');
+  const indexResp = await fetchUrl(indexUrl);
+  if (indexResp.status !== 200) throw new Error('Wilmington index HTTP ' + indexResp.status);
+
+  const html = indexResp.body.toString('utf8');
+
+  // Find the most recent CompStat PDF link
+  // Links look like: href="/home/showpublisheddocument/NNNN/NNNN"
+  // with link text containing "WPD CompStat Report"
+  // Strategy: find all showpublisheddocument hrefs near "CompStat" text
+  const linkMatches = [...html.matchAll(/href="(\/home\/showpublisheddocument\/[^"]+)"[^>]*>([^<]*(?:CompStat|compstat)[^<]*)</gi)];
+  let pdfPath = null;
+  if (linkMatches.length > 0) {
+    pdfPath = linkMatches[0][1];
+    console.log('Wilmington: found PDF link via anchor text:', pdfPath);
+  } else {
+    // Fallback: find any showpublisheddocument link that appears near "CompStat" in the HTML
+    const compstatIdx = html.toLowerCase().indexOf('compstat');
+    if (compstatIdx < 0) throw new Error('Wilmington: "CompStat" not found on index page');
+    const nearby = html.substring(Math.max(0, compstatIdx - 500), compstatIdx + 2000);
+    const nearbyMatch = nearby.match(/href="(\/home\/showpublisheddocument\/[^"]+)"/i);
+    if (!nearbyMatch) throw new Error('Wilmington: no showpublisheddocument link near CompStat section');
+    pdfPath = nearbyMatch[1];
+    console.log('Wilmington: found PDF link via proximity:', pdfPath);
+  }
+
+  const pdfUrl = 'https://www.wilmingtonde.gov' + pdfPath;
+  console.log('Wilmington: fetching PDF:', pdfUrl);
+  const pdfResp = await fetchUrl(pdfUrl);
+  if (pdfResp.status !== 200) throw new Error('Wilmington PDF HTTP ' + pdfResp.status);
+  console.log('Wilmington: PDF bytes:', pdfResp.body.length);
+
+  // Extract text from PDF using pdfjs
+  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
+  pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfResp.body) }).promise;
+
+  // Collect tokens from all pages
+  let allTokens = [];
+  for (let p = 1; p <= Math.min(pdf.numPages, 4); p++) {
+    const pg = await pdf.getPage(p);
+    const tc = await pg.getTextContent();
+    allTokens = allTokens.concat(tc.items.map(i => i.str.trim()).filter(Boolean));
+  }
+  const joined = allTokens.join(' ');
+  console.log('Wilmington: PDF tokens (first 300):', joined.substring(0, 300));
+
+  // Extract as-of date from PDF title/header
+  // CompStat reports typically say "Week Ending MM/DD/YYYY" or "Through MM/DD/YYYY" or have a date in the title
+  let asof = null;
+  const datePatterns = [
+    /[Ww]eek\s+[Ee]nding[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+    /[Tt]hrough[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+    /[Aa]s\s+[Oo]f[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+    /[Dd]ata\s+[Tt]hrough[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/,
+    /(\d{1,2})\/(\d{1,2})\/(\d{4})/,  // first date found anywhere
+  ];
+  for (const re of datePatterns) {
+    const m = joined.match(re);
+    if (m) {
+      asof = m[3] + '-' + m[1].padStart(2,'0') + '-' + m[2].padStart(2,'0');
+      console.log('Wilmington: asof from pattern', re.source.substring(0,30), ':', asof);
+      break;
+    }
+  }
+
+  // Find "Shooting Victims" row
+  // PDF table rows typically: label ... YTD_curr ... YTD_prior (or similar columns)
+  // Look for the row containing "Shooting Victim" (singular or plural)
+  const shootMatch = joined.match(/Shooting\s+Victim[s]?[\s\S]{0,300}?(?=[A-Z][a-z]+\s+[A-Z]|Homicide|Murder|Robbery|Assault|$)/i);
+  if (!shootMatch) {
+    // Try broader: any line with "Shooting" and numbers
+    const shootBroad = joined.match(/Shoot[a-z\s]+(\d+)[\s\S]{0,200}/i);
+    console.log('Wilmington: broad shoot match:', shootBroad ? shootBroad[0].substring(0,150) : 'none');
+    throw new Error('Wilmington: Shooting Victims row not found. Sample: ' + joined.substring(0, 400));
+  }
+  console.log('Wilmington: shooting row:', shootMatch[0].substring(0, 200));
+
+  // Extract integers from the matched section
+  const nums = [...shootMatch[0].matchAll(/(\d+)/g)].map(m => parseInt(m[1]));
+  console.log('Wilmington: shooting row nums:', nums);
+
+  if (nums.length < 2) throw new Error('Wilmington: not enough numbers in Shooting Victims row: ' + nums.join(','));
+
+  // CompStat layout is typically: [Week] [4-week] [YTD curr] [YTD prior] [% change]
+  // or: [YTD curr] [YTD prior] — depends on report format
+  // Use vision API to confirm if ambiguous, or trust position
+  // For now assume last two meaningful integers are YTD_curr, YTD_prior
+  // (or first two if only two numbers)
+  let ytd, prior;
+  if (nums.length === 2) {
+    [ytd, prior] = nums;
+  } else if (nums.length >= 4) {
+    // Typical CompStat: current week, 28-day, YTD curr, YTD prior
+    ytd   = nums[nums.length - 2];
+    prior = nums[nums.length - 1];
+  } else {
+    ytd   = nums[0];
+    prior = nums[1];
+  }
+
+  // Sanity check — YTD counts should be reasonable (0-999) and prior >= 0
+  if (ytd < 0 || ytd > 999 || prior < 0 || prior > 999) {
+    throw new Error('Wilmington: implausible values ytd=' + ytd + ' prior=' + prior + '. All nums: ' + nums.join(','));
+  }
+
+  console.log('Wilmington: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
+  return { ytd, prior, asof };
+}
+
+
 async function main() {
   const fetchedAt = new Date().toISOString();
   const outDir = path.join(__dirname, '..', 'data');
@@ -1014,6 +1132,7 @@ async function main() {
     safe('Portland',   fetchPortland,   120000),
     safe('Buffalo',    fetchBuffalo,    120000),
     safe('Nashville',  fetchNashville,  180000),
+    safe('Wilmington', fetchWilmington, 60000),
   ]);
 
   for (const { key, value } of fetches) {
