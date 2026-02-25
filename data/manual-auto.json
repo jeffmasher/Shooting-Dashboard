@@ -10,77 +10,89 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "durham": {
     "ytd": 16,
     "prior": 20,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 47,
     "prior": 56,
     "asof": "2026-02-24",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "memphis": {
     "ytd": 70,
     "prior": 97,
     "asof": "2026-02-24",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
-    "asof": "2025-01-31",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "asof": "2026-01-31",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "miamidade": {
     "ytd": 15,
     "prior": 27,
     "asof": "2026-02-20",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 12,
     "asof": "2026-02-25",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "portland": {
     "ytd": 9,
     "prior": 13,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "buffalo": {
     "ytd": 39,
     "prior": 48,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "nashville": {
     "ytd": 31,
     "prior": 45,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   },
   "hartford": {
     "ytd": 4,
     "prior": 4,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-02-25T18:58:18.755Z",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
+    "ok": true
+  },
+  "denver": {
+    "ok": false,
+    "error": "Denver: could not extract data",
+    "fetchedAt": "2026-02-25T19:56:47.684Z"
+  },
+  "portsmouth": {
+    "ytd": 3,
+    "prior": 14,
+    "asof": "2026-02-16",
+    "fetchedAt": "2026-02-25T19:56:47.684Z",
     "ok": true
   }
 }
