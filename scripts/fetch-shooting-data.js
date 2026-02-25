@@ -1038,8 +1038,10 @@ main().catch(e => { console.error(e); process.exit(1); });
 
 async function fetchPortland() {
   // Uses the Gun Violence Trends Report dashboard (YTD & Rolling Year Statistics sheet)
-  // Table has plain DOM text: Homicides by Firearm Incidents + Non-Fatal Injury Shooting Incidents
-  // = Shooting Incidents (matches Portland's definition, excludes No-Injury)
+  // Table numbers are SVG (not DOM text), so we screenshot + vision API.
+  // We crop just the YTD Statistics table to get clean numbers.
+  // Row order: HomicideVictims, HomFirearmVictims, HomFirearmIncidents, NonFatalInjury, NonInjury, Total
+  // We sum HomFirearmIncidents + NonFatalInjury = Shooting Incidents (Portland definition)
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: true });
   const page    = await browser.newPage();
@@ -1047,95 +1049,92 @@ async function fetchPortland() {
   page.setDefaultTimeout(30000);
 
   const yr = new Date().getFullYear();
-
   const embedUrl = 'https://public.tableau.com/views/GunViolenceTrendsReport/YeartoDateRollingYearStatistics?:showVizHome=no&:embed=true';
   console.log('Portland: loading Gun Violence Trends Report YTD sheet...');
   await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(12000);
 
-  // Get asof from date range text like "January 1, 2026 - January 31, 2026"
-  const bodyText = await page.evaluate(function() { return document.body.innerText; });
-  console.log('Portland: body sample:', bodyText.substring(0, 400));
+  // Wait for table to render — poll for text content stabilizing
+  let bodyText = '';
+  for (var w = 0; w < 10; w++) {
+    await page.waitForTimeout(3000);
+    bodyText = await page.evaluate(function() { return document.body.innerText; });
+    if (bodyText.includes('Total Shooting Incidents') && bodyText.length > 2000) break;
+    console.log('Portland: waiting for render... attempt', (w+1), 'len:', bodyText.length);
+  }
+  console.log('Portland: body length after wait:', bodyText.length);
 
   // Parse asof from "Current Year to Date: January 1, YYYY - Month D, YYYY"
   let asof = null;
-  const asofMatch = bodyText.match(/Current Year to Date:[^|]+\|[^\n]*?([A-Z][a-z]+ \d+, \d{4})/);
-  if (asofMatch) {
-    const d = new Date(asofMatch[1]);
-    if (!isNaN(d)) asof = d.toISOString().slice(0,10);
-  }
-  // Fallback: grab "Updated: M/D/YYYY"
+  const asofMatch = bodyText.match(/Current Year to Date:[^|]+\|\s*([A-Z][a-z]+ \d+, \d{4})/);
+  if (asofMatch) { const d = new Date(asofMatch[1]); if (!isNaN(d)) asof = d.toISOString().slice(0,10); }
   if (!asof) {
-    const upd = bodyText.match(/Updated:\s+(\d+)\/(\d+)\/(\d+)/);
+    const upd = bodyText.match(/Updated:\s*(\d+)\/(\d+)\/(\d+)/);
     if (upd) asof = upd[3] + '-' + upd[1].padStart(2,'0') + '-' + upd[2].padStart(2,'0');
   }
   console.log('Portland: asof:', asof);
 
-  // Parse the YTD table - find rows for Homicides by Firearm Incidents and Non-Fatal Injury Shooting Incidents
-  // Table text will contain these labels followed by numbers
-  // "Current YTD Count" is the first number after each label
-  const tableData = await page.evaluate(function(yr) {
-    // Get all text nodes and their values from the viz
-    var text = document.body.innerText;
-    return text;
-  }, yr);
+  // Screenshot the full page for vision API
+  const screenshotBuf = await page.screenshot({ fullPage: false });
+  await browser.close();
+  console.log('Portland: screenshot taken, size:', screenshotBuf.length, 'bytes');
 
-  console.log('Portland: full text length:', tableData.length);
+  const base64Image = screenshotBuf.toString('base64');
+  const promptText = [
+    'This is a Portland Police Bureau "Gun Violence Trends Report" Tableau dashboard showing the Year to Date Statistics table.',
+    'The table has these rows: Homicide Victims, Homicides by Firearm Victims, Homicides by Firearm Incidents, Non-Fatal Injury Shooting Incidents, Non-Injury Shooting Incidents, Total Shooting Incidents.',
+    'Columns include: Current YTD Count, Previous YTD Count.',
+    'Extract ONLY these two values:',
+    '  - "Homicides by Firearm Incidents" Current YTD Count → call it HOM',
+    '  - "Non-Fatal Injury Shooting Incidents" Current YTD Count → call it NFSI',
+    '  - "Homicides by Firearm Incidents" Previous YTD Count → call it HOM_PRIOR',
+    '  - "Non-Fatal Injury Shooting Incidents" Previous YTD Count → call it NFSI_PRIOR',
+    'Reply ONLY in this exact format with no other text: HOM=N NFSI=N HOM_PRIOR=N NFSI_PRIOR=N'
+  ].join(' ');
 
-  // Parse the table rows
-  // Expected format in DOM text (from screenshot):
-  // "Homicides by Firearm Incidents	1	2	..."
-  // "Non-Fatal Injury Shooting Incidents	8	11	..."
-  // or whitespace-separated
-
-  // Split into lines and find the rows we need
-  const lines = tableData.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-  console.log('Portland: line count:', lines.length);
-
-  // Log lines around key terms
-  const keyTerms = ['Homicide', 'Non-Fatal', 'Firearm', 'Total Shooting', 'YTD Count'];
-  lines.forEach(function(l, i) {
-    if (keyTerms.some(function(k) { return l.includes(k); })) {
-      console.log('Portland line', i + ':', l.substring(0, 120));
-    }
+  const claudeData = await new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 128,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
+        { type: 'text', text: promptText }
+      ]}]
+    });
+    const req = require('https').request({
+      hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY,
+                 'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(body) }
+    }, (res) => {
+      const chunks = []; res.on('data', c => chunks.push(c));
+      res.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString())); } catch(e) { reject(e); } });
+    });
+    req.on('error', reject); req.write(body); req.end();
   });
 
-  // Find Homicides by Firearm Incidents current YTD
-  // Find Non-Fatal Injury Shooting Incidents current YTD
-  let homFirearmYtd = null, homFirearmPrior = null;
-  let nfsiYtd = null, nfsiPrior = null;
+  const visionText = (claudeData.content?.[0]?.text || '').trim();
+  console.log('Portland vision response:', visionText);
 
-  for (var i = 0; i < lines.length; i++) {
-    var l = lines[i];
-    if (l.includes('Homicides by Firearm Incidents') || l === 'Homicides by Firearm Incidents') {
-      // Numbers may be on the same line (tab-separated) or the next few lines
-      var nums = (l + ' ' + (lines[i+1]||'') + ' ' + (lines[i+2]||'')).match(/\b(\d+)\b/g);
-      if (nums && nums.length >= 2) {
-        homFirearmYtd = parseInt(nums[0]);
-        homFirearmPrior = parseInt(nums[1]);
-        console.log('Portland: HomFirearm YTD=' + homFirearmYtd + ' Prior=' + homFirearmPrior);
-      }
-    }
-    if (l.includes('Non-Fatal Injury Shooting Incidents') || l === 'Non-Fatal Injury Shooting Incidents') {
-      var nums2 = (l + ' ' + (lines[i+1]||'') + ' ' + (lines[i+2]||'')).match(/\b(\d+)\b/g);
-      if (nums2 && nums2.length >= 2) {
-        nfsiYtd = parseInt(nums2[0]);
-        nfsiPrior = parseInt(nums2[1]);
-        console.log('Portland: NFSI YTD=' + nfsiYtd + ' Prior=' + nfsiPrior);
-      }
-    }
+  function extractVal(text, key) {
+    var idx = text.indexOf(key + '=');
+    if (idx < 0) return null;
+    var m = text.slice(idx + key.length + 1).match(/^(\d+)/);
+    return m ? parseInt(m[1]) : null;
   }
 
-  await browser.close();
+  const homYtd   = extractVal(visionText, 'HOM');
+  const nfsiYtd  = extractVal(visionText, 'NFSI');
+  const homPrior = extractVal(visionText, 'HOM_PRIOR');
+  const nfsiPrior = extractVal(visionText, 'NFSI_PRIOR');
 
-  if (homFirearmYtd === null || nfsiYtd === null) {
-    throw new Error('Portland: could not parse table values. homFirearm=' + homFirearmYtd + ' nfsi=' + nfsiYtd);
+  console.log('Portland: hom=' + homYtd + ' nfsi=' + nfsiYtd + ' hom_prior=' + homPrior + ' nfsi_prior=' + nfsiPrior);
+
+  if (homYtd === null || nfsiYtd === null || homPrior === null || nfsiPrior === null) {
+    throw new Error('Portland: vision parse failed: ' + visionText);
   }
 
-  const ytd   = homFirearmYtd + nfsiYtd;
-  const prior = homFirearmPrior + nfsiPrior;
-  console.log('Portland final: homFirearm=' + homFirearmYtd + '+' + nfsiYtd + '=' + ytd + ' prior=' + homFirearmPrior + '+' + nfsiPrior + '=' + prior + ' asof=' + asof);
-
+  const ytd   = homYtd + nfsiYtd;
+  const prior = homPrior + nfsiPrior;
+  console.log('Portland final: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
   if (ytd === 0 && prior === 0) throw new Error('Portland: parsed all zeros');
   return { ytd, prior, asof };
 }
@@ -1148,168 +1147,65 @@ async function fetchPortland() {
 // Filter by year client-side to get YTD vs prior YTD counts.
 
 async function fetchNashville() {
-  // Default filter is "This year". We download twice:
-  //   1) Default ("This year") → current YTD victims
-  //   2) Change to "Last year" → prior YTD victims (filtered to same MM/DD cutoff)
-  const { chromium } = require('playwright');
-  const fs = require('fs');
-  const browser = await chromium.launch({ headless: true });
-  const page    = await browser.newPage();
-  await page.setViewportSize({ width: 1536, height: 900 });
-  page.setDefaultTimeout(30000);
+  // Tableau Server (policepublicdata.nashville.gov) doesn't expose a download
+  // toolbar button for this viz. Use Tableau Server's direct CSV download URL:
+  // /views/WorkbookName/SheetName.csv with filter parameters.
+  // Filter param for "Offense Report Date" uses Tableau's URL filter syntax.
+  // Each row = one victim. Count victims by year for YTD vs prior YTD.
 
-  const embedUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:showVizHome=no&:embed=true&:toolbar=yes&:device=desktop';
+  const https = require('https');
+  const fs    = require('fs');
+  const base  = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries';
 
-  // Helper: find a Tableau tabComboBox by label/text and click it, return coords
-  async function findAndClickCombo(labelHint) {
-    const info = await page.evaluate(function(hint) {
-      var combos = Array.from(document.querySelectorAll('.tabComboBox'));
-      var match = combos.find(function(el) {
-        return (el.getAttribute('aria-label') || '').toLowerCase().includes(hint) ||
-               el.textContent.trim().toLowerCase().includes(hint);
-      });
-      if (!match) {
-        // Log all combos to help debug
-        return { found: false, all: combos.map(function(el) {
-          return { label: el.getAttribute('aria-label'), text: el.textContent.trim().substring(0,60) };
-        })};
-      }
-      var r = match.getBoundingClientRect();
-      return { found: true, x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2), text: match.textContent.trim().substring(0,60) };
-    }, labelHint);
-    if (info.found) {
-      await page.mouse.click(info.x, info.y);
-    }
-    return info;
+  async function downloadSheetCSV(filterParam) {
+    // Tableau Server CSV download URL
+    const url = base + '.csv?:showVizHome=no&:embed=true&' + filterParam;
+    console.log('Nashville: downloading CSV:', url);
+    return new Promise((resolve, reject) => {
+      const doReq = (reqUrl, redirects) => {
+        if (redirects > 5) return reject(new Error('Too many redirects'));
+        const urlObj = new URL(reqUrl);
+        const opts = { hostname: urlObj.hostname, path: urlObj.pathname + urlObj.search,
+                       method: 'GET', headers: { 'User-Agent': 'Mozilla/5.0' } };
+        require(urlObj.protocol === 'https:' ? 'https' : 'http').request(opts, (res) => {
+          if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+            return doReq(new URL(res.headers.location, reqUrl).href, redirects + 1);
+          }
+          const chunks = [];
+          res.on('data', c => chunks.push(c));
+          res.on('end', () => {
+            const buf = Buffer.concat(chunks);
+            console.log('Nashville: HTTP', res.statusCode, 'bytes:', buf.length, 'type:', res.headers['content-type']);
+            if (res.statusCode !== 200) return reject(new Error('HTTP ' + res.statusCode));
+            // Detect encoding
+            const text = (buf[0] === 0xFF && buf[1] === 0xFE) ? buf.toString('utf16le') : buf.toString('utf8');
+            resolve(text);
+          });
+        }).on('error', reject).end();
+      };
+      doReq(url, 0);
+    });
   }
 
-  // Helper: find an option in an open dropdown by text and click it
-  async function clickOption(optText) {
-    const info = await page.evaluate(function(text) {
-      var allEls = Array.from(document.querySelectorAll('*'));
-      // Look for leaf elements matching the text exactly
-      var opt = allEls.find(function(el) {
-        return (el.innerText || '').trim() === text && el.children.length === 0;
-      });
-      if (!opt) {
-        var items = allEls
-          .filter(function(el) { return el.tagName === 'LI' || el.getAttribute('role') === 'option'; })
-          .map(function(el) { return (el.innerText||el.textContent||'').trim().substring(0,50); })
-          .filter(Boolean);
-        return { found: false, items: items.slice(0, 15) };
-      }
-      var r = opt.getBoundingClientRect();
-      return { found: true, x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
-    }, optText);
-    if (info.found) {
-      await page.mouse.click(info.x, info.y);
-    }
-    return info;
-  }
-
-  // Helper: run the full download flow (opens menu, clicks Crosstab, selects CSV, downloads)
-  async function downloadCSV(label) {
-    // Click toolbar Download button
-    const dlBtn = await page.evaluate(function() {
-      var candidates = Array.from(document.querySelectorAll('*'));
-      var btn = candidates.find(function(el) {
-        var l = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
-        var r = el.getBoundingClientRect();
-        return (l.includes('download') || l.includes('export')) && r.width > 0 && r.height > 0;
-      });
-      if (!btn) return null;
-      var r = btn.getBoundingClientRect();
-      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2), label: btn.getAttribute('aria-label') };
-    });
-    if (!dlBtn) {
-      // Log all visible interactive elements for diagnosis
-      const allInteractive = await page.evaluate(function() {
-        return Array.from(document.querySelectorAll('*')).filter(function(el) {
-          var r = el.getBoundingClientRect();
-          return r.width > 0 && r.height > 0 && (
-            el.tagName === 'BUTTON' || el.tagName === 'A' ||
-            el.getAttribute('role') === 'button' ||
-            el.getAttribute('data-tb-test-id') ||
-            (typeof el.className === 'string' && (el.className.includes('toolbar') || el.className.includes('Toolbar')))
-          );
-        }).map(function(el) {
-          var r = el.getBoundingClientRect();
-          return { tag: el.tagName, testId: el.getAttribute('data-tb-test-id'),
-                   label: el.getAttribute('aria-label'), title: el.getAttribute('title'),
-                   cls: (typeof el.className==='string'?el.className:'').substring(0,60),
-                   text: (el.innerText||'').trim().substring(0,30),
-                   x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
-        }).slice(0, 40);
-      });
-      throw new Error('Nashville: Download btn not found. Interactive els: ' + JSON.stringify(allInteractive));
-    }
-    console.log('Nashville: download btn for ' + label + ':', JSON.stringify(dlBtn));
-    await page.mouse.click(dlBtn.x, dlBtn.y);
-    await page.waitForTimeout(1500);
-
-    // Click Crosstab
-    const ctBtn = await page.evaluate(function() {
-      var els = Array.from(document.querySelectorAll('*'));
-      var ct = els.find(function(el) { return (el.innerText || '').trim() === 'Crosstab'; });
-      if (!ct) return null;
-      var r = ct.getBoundingClientRect();
-      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
-    });
-    if (!ctBtn) throw new Error('Crosstab option not found');
-    await page.mouse.click(ctBtn.x, ctBtn.y);
-    await page.waitForTimeout(1500);
-
-    // Select CSV
-    const csvBtn = await page.evaluate(function() {
-      var els = Array.from(document.querySelectorAll('*'));
-      var csv = els.find(function(el) { return (el.innerText || '').trim() === 'CSV'; });
-      if (!csv) return null;
-      var r = csv.getBoundingClientRect();
-      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
-    });
-    if (csvBtn) {
-      await page.mouse.click(csvBtn.x, csvBtn.y);
-      await page.waitForTimeout(500);
-    }
-
-    // Click final Download button
-    const finalBtn = await page.evaluate(function() {
-      var btns = Array.from(document.querySelectorAll('button, [role="button"]'));
-      var dl = btns.find(function(b) {
-        var t = (b.innerText || b.textContent || '').trim();
-        return t === 'Download' || t === 'Export';
-      });
-      if (!dl) return null;
-      var r = dl.getBoundingClientRect();
-      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
-    });
-    if (!finalBtn) throw new Error('Final Download button not found');
-
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: 30000 }),
-      page.mouse.click(finalBtn.x, finalBtn.y)
-    ]);
-    const dlPath = await download.path();
-    const rawBuf = fs.readFileSync(dlPath);
-    const csvText = (rawBuf[0] === 0xFF && rawBuf[1] === 0xFE)
-      ? rawBuf.toString('utf16le')
-      : rawBuf.toString('utf8');
-    console.log('Nashville: ' + label + ' CSV downloaded, bytes:', rawBuf.length, 'rows:', csvText.split('\n').length);
-    return csvText;
-  }
-
-  // Helper: count victim rows in a CSV for a given year, up to MM/DD cutoff
+  // Helper: count victim rows in CSV for a given year, up to MM/DD cutoff
   function countVictims(csvText, targetYear, mmddCutoff) {
     var lines = csvText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-    var header = lines[0].replace(/^\uFEFF/, '');
+    var header = lines[0].replace(/^\uFEFF/, '').replace(/^\xFF\xFE/, '');
     var cols = header.split('\t');
     var rptdtIdx = cols.indexOf('I Rptdt');
-    if (rptdtIdx < 0) throw new Error('I Rptdt column not found, cols: ' + cols.join(','));
+    if (rptdtIdx < 0) {
+      // Try comma-separated
+      cols = header.split(',');
+      rptdtIdx = cols.findIndex(function(c) { return c.replace(/"/g,'').trim() === 'I Rptdt'; });
+    }
+    console.log('Nashville: header cols:', cols.slice(0,6).join(' | '), '| rptdtIdx:', rptdtIdx);
+    if (rptdtIdx < 0) throw new Error('I Rptdt column not found. Header: ' + header.substring(0,200));
+    var sep = header.includes('\t') ? '\t' : ',';
     var count = 0, maxDate = null, asof = null;
     for (var i = 1; i < lines.length; i++) {
-      var parts = lines[i].split('\t');
+      var parts = lines[i].split(sep);
       if (parts.length <= rptdtIdx) continue;
-      var rptdt = (parts[rptdtIdx] || '').trim();
+      var rptdt = parts[rptdtIdx].replace(/"/g,'').trim();
       if (!rptdt) continue;
       var datePart = rptdt.split(' ')[0];
       var dp = datePart.split('/');
@@ -1323,95 +1219,138 @@ async function fetchNashville() {
       var d = new Date(rowYr, parseInt(dp[0])-1, parseInt(dp[1]));
       if (!maxDate || d > maxDate) { maxDate = d; asof = rowYr + '-' + rowMm + '-' + rowDd; }
     }
-    return { count: count, asof: asof };
+    return { count, asof };
   }
 
-  // ── Step 1: Load page, confirm it renders ──────────────────────────────────
-  console.log('Nashville: loading dashboard...');
-  await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(10000);
-
-  const bodyText = await page.evaluate(function() { return document.body.innerText; });
-  console.log('Nashville: page sample:', bodyText.substring(0, 300));
-
-  const now = new Date();
-  const curYr = now.getFullYear();
+  const now    = new Date();
+  const curYr  = now.getFullYear();
   const priorYr = curYr - 1;
-  const mmdd = (now.getMonth() + 1).toString().padStart(2,'0') + '/' + now.getDate().toString().padStart(2,'0');
+  const mmdd   = (now.getMonth()+1).toString().padStart(2,'0') + '/' + now.getDate().toString().padStart(2,'0');
 
-  // ── Step 2: Download current year CSV (default "This year" filter) ─────────
-  let csvCurrent = null;
+  // Try direct CSV download with Tableau URL filters
+  // "Offense Report Date" filter values: "This year", "Last year"
+  // Tableau URL filter syntax: FieldName=Value (URL-encoded)
+  let csvCurrent = null, csvPrior = null;
+
   try {
-    csvCurrent = await downloadCSV('current year');
+    csvCurrent = await downloadSheetCSV('Offense+Report+Date=This+year');
+    console.log('Nashville: current CSV preview:', csvCurrent.substring(0, 300));
   } catch(e) {
-    console.log('Nashville: current year download failed:', e.message.split('\n')[0]);
+    console.log('Nashville: current year direct CSV failed:', e.message.split('\n')[0]);
   }
 
-  // ── Step 3: Change filter to "Last year", download prior year CSV ──────────
-  let csvPrior = null;
   try {
-    // Date filter is a single-value list. From page text we know "This year" is visible.
-    // Find it and click to open/toggle, then click "Last year".
-    console.log('Nashville: switching filter to Last year...');
+    csvPrior = await downloadSheetCSV('Offense+Report+Date=Last+year');
+    console.log('Nashville: prior CSV preview:', csvPrior.substring(0, 300));
+  } catch(e) {
+    console.log('Nashville: prior year direct CSV failed:', e.message.split('\n')[0]);
+  }
 
-    // First: log all visible text elements that could be the filter
-    const filterCandidates = await page.evaluate(function() {
-      var allEls = Array.from(document.querySelectorAll('*'));
-      return allEls.filter(function(el) {
-        var t = (el.innerText || '').trim();
-        var r = el.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && (
-          t === 'This year' || t === 'Last year' || t === 'Last 3 years' ||
-          t === 'This Year' || t === 'Last Year'
-        );
-      }).map(function(el) {
-        var r = el.getBoundingClientRect();
-        return { tag: el.tagName, cls: (typeof el.className==='string'?el.className:'').substring(0,80),
-                 text: (el.innerText||'').trim(), role: el.getAttribute('role'),
-                 x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
-      });
-    });
-    console.log('Nashville: date filter candidates:', JSON.stringify(filterCandidates));
+  // Fallback: use Playwright to change filter and download via keyboard shortcut
+  if (!csvCurrent || !csvPrior) {
+    console.log('Nashville: direct CSV failed, trying Playwright fallback...');
+    const { chromium } = require('playwright');
+    const browser = await chromium.launch({ headless: true });
+    const page = await browser.newPage();
+    await page.setViewportSize({ width: 1536, height: 900 });
+    page.setDefaultTimeout(30000);
+    const embedUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:showVizHome=no&:embed=true&:toolbar=yes&:device=desktop';
 
-    // Click "Last year" directly if visible, otherwise click "This year" to open then "Last year"
-    var lastYearEl = filterCandidates.find(function(c) { return c.text === 'Last year' || c.text === 'Last Year'; });
-    if (lastYearEl) {
-      console.log('Nashville: clicking Last year directly at', lastYearEl.x, lastYearEl.y);
-      await page.mouse.click(lastYearEl.x, lastYearEl.y);
-      await page.waitForTimeout(3000);
-    } else {
-      var thisYearEl = filterCandidates.find(function(c) { return c.text === 'This year' || c.text === 'This Year'; });
-      if (thisYearEl) {
-        console.log('Nashville: clicking This year to open filter at', thisYearEl.x, thisYearEl.y);
-        await page.mouse.click(thisYearEl.x, thisYearEl.y);
-        await page.waitForTimeout(2000);
-        const optResult = await clickOption('Last year');
-        console.log('Nashville: Last year after open:', JSON.stringify(optResult));
-        await page.waitForTimeout(3000);
-      } else {
-        console.log('Nashville: no date filter elements found, proceeding without filter change');
+    async function getCSVViaPage(filterText, yearLabel) {
+      await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+      await page.waitForTimeout(8000);
+
+      // If not current year, click the date filter button to change it
+      if (filterText !== 'This year') {
+        const filterBtn = await page.evaluate(function(target) {
+          var allEls = Array.from(document.querySelectorAll('*'));
+          var btn = allEls.find(function(el) {
+            return (el.innerText || '').trim() === 'This year' &&
+                   el.tagName === 'BUTTON' && el.className.includes('dijit');
+          });
+          if (!btn) return null;
+          var r = btn.getBoundingClientRect();
+          return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
+        }, filterText);
+
+        if (filterBtn) {
+          // Click the dropdown arrow (slightly to the right of button center)
+          await page.mouse.click(filterBtn.x + 10, filterBtn.y);
+          await page.waitForTimeout(2000);
+          // Log all new elements that appeared
+          const newEls = await page.evaluate(function() {
+            return Array.from(document.querySelectorAll('.dijitPopup *, .dijitMenuItemLabel, [class*="MenuItem"]')).map(function(el) {
+              return { tag: el.tagName, cls: (typeof el.className==='string'?el.className:'').substring(0,60), text: (el.innerText||'').trim().substring(0,40) };
+            }).filter(function(e) { return e.text; }).slice(0,20);
+          });
+          console.log('Nashville: popup items after filter click:', JSON.stringify(newEls));
+
+          // Try to find and click the target option
+          const optResult = await page.evaluate(function(target) {
+            var allEls = Array.from(document.querySelectorAll('*'));
+            var opt = allEls.find(function(el) {
+              var t = (el.innerText || '').trim();
+              return t === target && el.className && (typeof el.className === 'string') &&
+                     (el.className.includes('dijit') || el.className.includes('Menu'));
+            });
+            if (!opt) {
+              // Broader search
+              opt = allEls.find(function(el) { return (el.innerText||'').trim() === target; });
+            }
+            if (!opt) return null;
+            var r = opt.getBoundingClientRect();
+            return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2), cls: (typeof opt.className==='string'?opt.className:'').substring(0,60) };
+          }, filterText);
+          console.log('Nashville:', filterText, 'option:', JSON.stringify(optResult));
+          if (optResult) {
+            await page.mouse.click(optResult.x, optResult.y);
+            await page.waitForTimeout(4000);
+          }
+        }
       }
+
+      // Try Ctrl+Shift+D or other keyboard shortcuts to trigger download
+      // Or try the viewData URL from the page context
+      const viewDataUrl = await page.evaluate(function() {
+        // Look for any download-related URLs in the page
+        var scripts = Array.from(document.querySelectorAll('script')).map(function(s) { return s.src || ''; }).filter(Boolean);
+        return { origin: window.location.origin, href: window.location.href };
+      });
+      console.log('Nashville: page context:', JSON.stringify(viewDataUrl));
+
+      // As last resort, read the Gunshot Victim Counts from the DOM
+      const countText = await page.evaluate(function() {
+        var allEls = Array.from(document.querySelectorAll('*'));
+        var el = allEls.find(function(e) { return (e.innerText||'').includes('Gunshot Victim Counts'); });
+        return el ? el.innerText.substring(0, 300) : null;
+      });
+      console.log('Nashville:', yearLabel, 'victim counts text:', countText);
+      return null; // CSV not available via Playwright
     }
 
-    csvPrior = await downloadCSV('prior year');
-  } catch(e) {
-    console.log('Nashville: prior year download failed:', e.message.split('\n')[0]);
+    if (!csvCurrent) await getCSVViaPage('This year', 'current');
+    if (!csvPrior)   await getCSVViaPage('Last year', 'prior');
+    await browser.close();
   }
 
-  await browser.close();
+  if (!csvCurrent && !csvPrior) {
+    throw new Error('Nashville: could not obtain CSV data via any method');
+  }
 
-  if (!csvCurrent) throw new Error('Nashville: no current year CSV');
-  if (!csvPrior)   throw new Error('Nashville: no prior year CSV');
+  // Parse counts
+  let ytd = null, prior = null, asof = null;
+  if (csvCurrent) {
+    const r = countVictims(csvCurrent, curYr, null);
+    ytd = r.count; asof = r.asof;
+    console.log('Nashville: current year victims:', ytd, 'asof:', asof);
+  }
+  if (csvPrior) {
+    const r = countVictims(csvPrior, priorYr, mmdd);
+    prior = r.count;
+    console.log('Nashville: prior year victims (to', mmdd + '):', prior);
+  }
 
-  // ── Step 4: Parse both CSVs ────────────────────────────────────────────────
-  const currResult  = countVictims(csvCurrent, curYr,   null);   // all current year = YTD by definition
-  const priorResult = countVictims(csvPrior,   priorYr, mmdd);   // prior year up to same MM/DD
-
-  const ytd   = currResult.count;
-  const prior = priorResult.count;
-  const asof  = currResult.asof;
-
-  console.log('Nashville parsed: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof + ' (cutoff=' + mmdd + ')');
-  if (ytd === 0 && prior === 0) throw new Error('Nashville: parsed all zeros');
+  if (ytd === null || prior === null) throw new Error('Nashville: missing data ytd=' + ytd + ' prior=' + prior);
+  if (ytd === 0 && prior === 0) throw new Error('Nashville: all zeros');
   return { ytd, prior, asof };
 }
