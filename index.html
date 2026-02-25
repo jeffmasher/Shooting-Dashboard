@@ -1036,21 +1036,6 @@ var CITIES = [
       } catch(e) { return null; }
     }
   },
-  {
-    id: 'wilmington',
-    name: 'Wilmington, DE',
-    note: 'Shooting Victims (Manual)',
-    type: 'Victims',
-    manual: true,
-    dataUrl: 'https://www.wilmingtonde.gov/government/public-safety/wilmington-police-department/compstat-reports',
-    count: async function(s, e) {
-      var key = 'manual_' + this.id + '_' + s.slice(0,4);
-      try { var r = await window.storage.get(key); return r ? parseInt(r.value) : null; } catch(e) { return null; }
-    },
-    latest: async function() {
-      try { var r = await window.storage.get('manual_' + this.id + '_asof'); return r ? r.value : null; } catch(e) { return null; }
-    }
-  },
 
 
   {
@@ -1136,27 +1121,6 @@ var CITIES = [
     latest: async function() {
       var auto = await loadAutoData();
       if (auto.buffalo && auto.buffalo.ok && auto.buffalo.asof) return auto.buffalo.asof;
-      return null;
-    }
-  },
-  {
-    id: 'decatur',
-    name: 'Decatur, IL',
-    note: 'Shooting Hits (DPD Crime Analysis)',
-    type: 'Victims',
-    dataUrl: 'https://public.powerdms.com/Dec8366/tree/documents/2060598',
-    count: async function(s, e) {
-      var auto = await loadAutoData();
-      var windowYear = parseInt(s.slice(0,4));
-      if (auto.decatur && auto.decatur.ok) {
-        var asofYear = auto.decatur.asof ? parseInt(auto.decatur.asof.slice(0,4)) : CURRENT_YEAR;
-        return windowYear === asofYear ? auto.decatur.ytd : auto.decatur.prior;
-      }
-      return null;
-    },
-    latest: async function() {
-      var auto = await loadAutoData();
-      if (auto.decatur && auto.decatur.ok && auto.decatur.asof) return auto.decatur.asof;
       return null;
     }
   },
