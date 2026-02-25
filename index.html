@@ -1157,7 +1157,7 @@ var CITIES = [
     _loadData: async function() {
       if (this._cache) return this._cache;
       // Query Total Type rows for Non-Fatal Gunshot Injury in CMPD Jurisdiction
-      var where = "ROW_TYPE = 'Total Type' AND OFFENSE_DESCRIPTION = 'Non-Fatal Gunshot Injury' AND GEOGRAPHY = 'CMPD Jurisdiction'";
+      var where = "ROW_TYPE = 'CMPD Jurisdiction' AND OFFENSE_DESCRIPTION = 'Non-Fatal Gunshot Injury'";
       var url = this._url + '?where=' + encodeURIComponent(where) +
         '&outFields=CALENDAR_YEAR,CALENDAR_MONTH,OFFENSE_COUNT,GEOGRAPHY&returnGeometry=false&resultRecordCount=2000&f=json';
       var r = await fetch(url, { signal: AbortSignal.timeout(20000) });
