@@ -309,7 +309,7 @@
 
   <div class="table-card">
     <div class="table-top">
-      <div class="table-label">Shooting Incidents by City</div>
+      <div class="table-label">Shooting Incidents by Agency</div>
       <div class="fetch-status" id="fetchStatus">—</div>
     </div>
     <table>
@@ -1585,7 +1585,7 @@ function exportJPEG() {
     var s = state[city.id] || {};
     if (s.ytd == null) return null;
     var chg = (s.prior != null && s.prior > 0) ? ((s.ytd - s.prior) / s.prior * 100) : null;
-    return { name: city.name, ytd: s.ytd, prior: s.prior, chg: chg, asof: s.asof };
+    return { name: city.name, type: city.type, ytd: s.ytd, prior: s.prior, chg: chg, asof: s.asof };
   }).filter(Boolean);
 
   if (!rows.length) { alert('No data to export yet — click Refresh All first.'); return; }
@@ -1645,6 +1645,7 @@ function exportJPEG() {
 
   // ── Column headers ────────────────────────────────────────────────────────
   var colCity  = 24;
+  var colType  = 200;
   var colYTD   = W - 330;
   var colPrior = W - 240;
   var colChg   = W - 140;
@@ -1652,7 +1653,8 @@ function exportJPEG() {
 
   ctx.fillStyle = FT_LIGHT;
   ctx.font = 'bold 10px Arial, sans-serif';
-  ctx.textAlign = 'left';  ctx.fillText('CITY', colCity, 103);
+  ctx.textAlign = 'left';  ctx.fillText('AGENCY', colCity, 103);
+  ctx.textAlign = 'left';  ctx.fillText('TYPE', colType, 103);
   ctx.textAlign = 'right'; ctx.fillText(year + ' YTD', colYTD, 103);
   ctx.textAlign = 'right'; ctx.fillText((year-1) + ' YTD', colPrior, 103);
   ctx.textAlign = 'right'; ctx.fillText('CHANGE', colChg, 103);
@@ -1673,6 +1675,12 @@ function exportJPEG() {
     ctx.font = '13px Georgia, serif';
     ctx.textAlign = 'left';
     ctx.fillText(row.name, colCity, y);
+
+    // Type
+    ctx.fillStyle = FT_LIGHT;
+    ctx.font = '10px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(row.type || '', colType, y);
 
     // YTD
     ctx.font = 'bold 13px Georgia, serif';
@@ -1755,7 +1763,7 @@ function exportCSV() {
   var w    = getWindows(parseInt(year));
   var now  = new Date().toISOString().slice(0, 10);
 
-  var header = ['City', 'Source', 'Type', 'YTD', 'Last YTD', '% Change', 'As Of', 'YTD End', 'Prior YTD End', 'Export Date'];
+  var header = ['Agency', 'Source', 'Type', 'YTD', 'Last YTD', '% Change', 'As Of', 'YTD End', 'Prior YTD End', 'Export Date'];
   var rows = CITIES.map(function(city) {
     var s = state[city.id] || {};
     var chg = (s.ytd != null && s.prior > 0) ? ((s.ytd - s.prior) / s.prior * 100).toFixed(1) : '';
