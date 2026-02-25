@@ -10,66 +10,68 @@
     "ytd": 34,
     "prior": 50,
     "asof": "2026-02-19",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "durham": {
     "ytd": 16,
     "prior": 20,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 46,
     "prior": 56,
     "asof": "2026-02-23",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "memphis": {
-    "ok": false,
-    "error": "Could not find 2026: N in chart text. Sample: Show keyboard shortcuts\nShow screen reader tips\nSkip to main content\nPower BI Report\n\nCity of Memphis Safer Communities Dashboard\n\nFigures are preliminary and subject to further review and analysis\n\nCrime Overview\nCrime Summary\nWeekly Crime Trend\nArrests\nCrash Map\nCVI Program Map\nMurder\nSelect a Year\n2021\n2022\n2023\n2024\n2025\n2026\nAggravated Assault\nNon-Fatal Shooting Incidents\nSexual Assault\n0\n50\n",
-    "fetchedAt": "2026-02-25T14:44:25.634Z"
+    "ytd": 702025,
+    "prior": 97,
+    "asof": "2026-02-24",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
+    "ok": true
   },
   "hampton": {
     "ytd": 0,
     "prior": 4,
-    "asof": "2025-01-31",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "asof": "2026-01-31",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "miamidade": {
     "ytd": 15,
     "prior": 27,
     "asof": "2026-02-20",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 12,
     "asof": "2026-02-25",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "portland": {
     "ytd": 9,
     "prior": 13,
     "asof": null,
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "buffalo": {
     "ytd": 39,
     "prior": 48,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-02-25T14:44:25.634Z",
+    "fetchedAt": "2026-02-25T14:57:35.393Z",
     "ok": true
   },
   "nashville": {
     "ok": false,
     "error": "Cannot find module 'pdf-parse'\nRequire stack:\n- /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/scripts/fetch-shooting-data.js",
-    "fetchedAt": "2026-02-25T14:44:25.634Z"
+    "fetchedAt": "2026-02-25T14:57:35.393Z"
   }
 }
