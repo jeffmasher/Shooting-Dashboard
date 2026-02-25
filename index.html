@@ -218,13 +218,48 @@
   }
   .footer-logo { display: flex; align-items: center; gap: 14px; }
 
+  /* ── Mobile: mid-size ── */
   @media (max-width: 700px) {
-    .wrap { padding: 0 16px 60px; }
-    .title-block h1 { font-size: 28px; }
+    .wrap { padding: 0 12px 48px; }
+    .title-block h1 { font-size: 26px; }
     .summary { flex-direction: column; }
-    .summary-cell { border-right: none; border-bottom: 1px solid var(--border); }
-    td, thead th { padding: 11px 12px; }
+    .summary-cell { border-right: none; border-bottom: 1px solid var(--border); padding: 12px 16px; }
+    .s-val { font-size: 24px; }
+    header { padding: 18px 0 16px; margin-bottom: 16px; gap: 12px; }
     .masthead { flex-wrap: wrap; }
+    .controls { gap: 6px; }
+    .btn { padding: 7px 12px; font-size: 10px; }
+    footer { flex-direction: column; align-items: flex-start; }
+  }
+
+  /* ── Mobile: small screens ── */
+  @media (max-width: 600px) {
+    /* Horizontal scroll wrapper for table */
+    .table-card { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    table { min-width: 560px; }
+    td, thead th { padding: 10px 10px; }
+    .city-name { font-size: 13.5px; }
+    .city-note { font-size: 8.5px; }
+    .num { font-size: 12.5px; }
+    .chg { font-size: 11px; }
+    .asof { font-size: 9px; }
+    .type-badge { font-size: 8px; padding: 2px 5px; }
+    .manual-btn { font-size: 8px; padding: 2px 6px; }
+    .table-top { padding: 10px 12px; }
+    .table-label { font-size: 8px; }
+    .fetch-status { font-size: 9px; }
+    .summary { margin-bottom: 18px; }
+    .title-meta { font-size: 9px; }
+  }
+
+  /* ── Mobile: very small screens ── */
+  @media (max-width: 420px) {
+    .wrap { padding: 0 8px 40px; }
+    .title-block h1 { font-size: 22px; }
+    .s-val { font-size: 20px; }
+    .s-label { font-size: 8px; }
+    .summary-cell { padding: 10px 12px; }
+    .manual-modal { padding: 20px 16px; }
   }
 </style>
 </head>
@@ -874,9 +909,9 @@ var CITIES = [
   {
     id: 'portland',
     name: 'Portland, OR',
-    note: 'Shooting Incidents (Homicide + Non-Fatal, Tableau)',
+    note: 'Shooting Incidents (Homicide + Non-Fatal Injury)',
     type: 'Incidents',
-    dataUrl: 'https://public.tableau.com/app/profile/portlandpolicebureau/viz/PortlandShootingIncidentStatistics/ShootingIncidentStatistics',
+    dataUrl: 'https://public.tableau.com/views/PPBOpenDataDownloads/Shootings.csv?:showVizHome=no',
     count: async function(s, e) {
       var auto = await loadAutoData();
       if (auto.portland && auto.portland.ok) {
@@ -1239,7 +1274,7 @@ var CITIES = [
   {
     id: 'portsmouth',
     name: 'Portsmouth, VA',
-    note: 'GSW Victims (Non-Fatal + Fatal Non-Suicide)',
+    note: 'GSW Victims (Total minus Suicide)',
     type: 'Victims',
     dataUrl: 'https://app.powerbigov.us/view?r=eyJrIjoiZDc3ZmQyYzMtOTgyYi00ODQzLTk4ZWUtZWQyY2ZkODM5ZWNkIiwidCI6ImM3N2RiNGQ4LWEwZjUtNDU0YS05MmMxLWI3ZDg0YzY0ZmQ0NCJ9',
     count: async function(s, e) {
