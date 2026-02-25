@@ -1,816 +1,1368 @@
-2026-02-25T00:44:18.6358163Z Current runner version: '2.331.0'
-2026-02-25T00:44:18.6393823Z ##[group]Runner Image Provisioner
-2026-02-25T00:44:18.6395106Z Hosted Compute Agent
-2026-02-25T00:44:18.6395918Z Version: 20260123.484
-2026-02-25T00:44:18.6397022Z Commit: 6bd6555ca37d84114959e1c76d2c01448ff61c5d
-2026-02-25T00:44:18.6398260Z Build Date: 2026-01-23T19:41:17Z
-2026-02-25T00:44:18.6399249Z Worker ID: {0a1a7343-cfd3-47f1-8909-7f08baa026ab}
-2026-02-25T00:44:18.6400574Z Azure Region: northcentralus
-2026-02-25T00:44:18.6401556Z ##[endgroup]
-2026-02-25T00:44:18.6404564Z ##[group]Operating System
-2026-02-25T00:44:18.6405633Z Ubuntu
-2026-02-25T00:44:18.6406400Z 24.04.3
-2026-02-25T00:44:18.6407100Z LTS
-2026-02-25T00:44:18.6407972Z ##[endgroup]
-2026-02-25T00:44:18.6408708Z ##[group]Runner Image
-2026-02-25T00:44:18.6409813Z Image: ubuntu-24.04
-2026-02-25T00:44:18.6410725Z Version: 20260201.15.1
-2026-02-25T00:44:18.6412795Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260201.15/images/ubuntu/Ubuntu2404-Readme.md
-2026-02-25T00:44:18.6415731Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260201.15
-2026-02-25T00:44:18.6417343Z ##[endgroup]
-2026-02-25T00:44:18.6419146Z ##[group]GITHUB_TOKEN Permissions
-2026-02-25T00:44:18.6422350Z Contents: write
-2026-02-25T00:44:18.6423404Z Metadata: read
-2026-02-25T00:44:18.6424478Z ##[endgroup]
-2026-02-25T00:44:18.6427395Z Secret source: Actions
-2026-02-25T00:44:18.6428733Z Prepare workflow directory
-2026-02-25T00:44:18.6911125Z Prepare all required actions
-2026-02-25T00:44:18.6969118Z Getting action download info
-2026-02-25T00:44:18.9932630Z Download action repository 'actions/checkout@v4' (SHA:34e114876b0b11c390a56381ad16ebd13914f8d5)
-2026-02-25T00:44:19.1169378Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
-2026-02-25T00:44:19.2074992Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
-2026-02-25T00:44:19.4219544Z Complete job name: fetch-data
-2026-02-25T00:44:19.4976899Z ##[group]Run actions/checkout@v4
-2026-02-25T00:44:19.4977830Z with:
-2026-02-25T00:44:19.4978318Z   repository: AH-Datalytics/Shooting-Dashboard
-2026-02-25T00:44:19.4979149Z   token: ***
-2026-02-25T00:44:19.4979564Z   ssh-strict: true
-2026-02-25T00:44:19.4979983Z   ssh-user: git
-2026-02-25T00:44:19.4980416Z   persist-credentials: true
-2026-02-25T00:44:19.4980887Z   clean: true
-2026-02-25T00:44:19.4981311Z   sparse-checkout-cone-mode: true
-2026-02-25T00:44:19.4981817Z   fetch-depth: 1
-2026-02-25T00:44:19.4982240Z   fetch-tags: false
-2026-02-25T00:44:19.4982667Z   show-progress: true
-2026-02-25T00:44:19.4983252Z   lfs: false
-2026-02-25T00:44:19.4983662Z   submodules: false
-2026-02-25T00:44:19.4984113Z   set-safe-directory: true
-2026-02-25T00:44:19.4984860Z ##[endgroup]
-2026-02-25T00:44:19.6104101Z Syncing repository: AH-Datalytics/Shooting-Dashboard
-2026-02-25T00:44:19.6106440Z ##[group]Getting Git version info
-2026-02-25T00:44:19.6108070Z Working directory is '/home/runner/work/Shooting-Dashboard/Shooting-Dashboard'
-2026-02-25T00:44:19.6110266Z [command]/usr/bin/git version
-2026-02-25T00:44:19.6190535Z git version 2.52.0
-2026-02-25T00:44:19.6218388Z ##[endgroup]
-2026-02-25T00:44:19.6233289Z Temporarily overriding HOME='/home/runner/work/_temp/566766cf-bd22-4cfe-a23a-8eda97c90c73' before making global git config changes
-2026-02-25T00:44:19.6236076Z Adding repository directory to the temporary git global config as a safe directory
-2026-02-25T00:44:19.6247743Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Shooting-Dashboard/Shooting-Dashboard
-2026-02-25T00:44:19.6291381Z Deleting the contents of '/home/runner/work/Shooting-Dashboard/Shooting-Dashboard'
-2026-02-25T00:44:19.6294920Z ##[group]Initializing the repository
-2026-02-25T00:44:19.6299484Z [command]/usr/bin/git init /home/runner/work/Shooting-Dashboard/Shooting-Dashboard
-2026-02-25T00:44:19.6422676Z hint: Using 'master' as the name for the initial branch. This default branch name
-2026-02-25T00:44:19.6425027Z hint: will change to "main" in Git 3.0. To configure the initial branch name
-2026-02-25T00:44:19.6427305Z hint: to use in all of your new repositories, which will suppress this warning,
-2026-02-25T00:44:19.6428790Z hint: call:
-2026-02-25T00:44:19.6429516Z hint:
-2026-02-25T00:44:19.6430467Z hint: 	git config --global init.defaultBranch <name>
-2026-02-25T00:44:19.6431723Z hint:
-2026-02-25T00:44:19.6432822Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
-2026-02-25T00:44:19.6434839Z hint: 'development'. The just-created branch can be renamed via this command:
-2026-02-25T00:44:19.6436330Z hint:
-2026-02-25T00:44:19.6437115Z hint: 	git branch -m <name>
-2026-02-25T00:44:19.6437985Z hint:
-2026-02-25T00:44:19.6439151Z hint: Disable this message with "git config set advice.defaultBranchName false"
-2026-02-25T00:44:19.6441392Z Initialized empty Git repository in /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/.git/
-2026-02-25T00:44:19.6445325Z [command]/usr/bin/git remote add origin https://github.com/AH-Datalytics/Shooting-Dashboard
-2026-02-25T00:44:19.6476338Z ##[endgroup]
-2026-02-25T00:44:19.6477800Z ##[group]Disabling automatic garbage collection
-2026-02-25T00:44:19.6480836Z [command]/usr/bin/git config --local gc.auto 0
-2026-02-25T00:44:19.6512529Z ##[endgroup]
-2026-02-25T00:44:19.6514131Z ##[group]Setting up auth
-2026-02-25T00:44:19.6520067Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
-2026-02-25T00:44:19.6552410Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
-2026-02-25T00:44:19.6947203Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
-2026-02-25T00:44:19.6983436Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
-2026-02-25T00:44:19.7208714Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
-2026-02-25T00:44:19.7249693Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-2026-02-25T00:44:19.7485516Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***
-2026-02-25T00:44:19.7524829Z ##[endgroup]
-2026-02-25T00:44:19.7526210Z ##[group]Fetching the repository
-2026-02-25T00:44:19.7537350Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +bb7ac10396ec4e484a79496ca7f7b75a9febc501:refs/remotes/origin/main
-2026-02-25T00:44:20.0850073Z From https://github.com/AH-Datalytics/Shooting-Dashboard
-2026-02-25T00:44:20.0851795Z  * [new ref]         bb7ac10396ec4e484a79496ca7f7b75a9febc501 -> origin/main
-2026-02-25T00:44:20.0882972Z ##[endgroup]
-2026-02-25T00:44:20.0884011Z ##[group]Determining the checkout info
-2026-02-25T00:44:20.0885670Z ##[endgroup]
-2026-02-25T00:44:20.0890905Z [command]/usr/bin/git sparse-checkout disable
-2026-02-25T00:44:20.0934217Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig
-2026-02-25T00:44:20.0960592Z ##[group]Checking out the ref
-2026-02-25T00:44:20.0965359Z [command]/usr/bin/git checkout --progress --force -B main refs/remotes/origin/main
-2026-02-25T00:44:20.1042705Z Switched to a new branch 'main'
-2026-02-25T00:44:20.1045562Z branch 'main' set up to track 'origin/main'.
-2026-02-25T00:44:20.1052348Z ##[endgroup]
-2026-02-25T00:44:20.1087076Z [command]/usr/bin/git log -1 --format=%H
-2026-02-25T00:44:20.1108884Z bb7ac10396ec4e484a79496ca7f7b75a9febc501
-2026-02-25T00:44:20.1367406Z ##[group]Run actions/setup-node@v4
-2026-02-25T00:44:20.1367982Z with:
-2026-02-25T00:44:20.1368359Z   node-version: 20
-2026-02-25T00:44:20.1368781Z   always-auth: false
-2026-02-25T00:44:20.1369209Z   check-latest: false
-2026-02-25T00:44:20.1369789Z   token: ***
-2026-02-25T00:44:20.1370401Z ##[endgroup]
-2026-02-25T00:44:20.3208198Z Found in cache @ /opt/hostedtoolcache/node/20.20.0/x64
-2026-02-25T00:44:20.3209978Z ##[group]Environment details
-2026-02-25T00:44:23.0709746Z node: v20.20.0
-2026-02-25T00:44:23.0710272Z npm: 10.8.2
-2026-02-25T00:44:23.0710621Z yarn: 1.22.22
-2026-02-25T00:44:23.0711860Z ##[endgroup]
-2026-02-25T00:44:23.0823932Z ##[group]Run npm install pdfjs-dist@3.11.174 playwright
-2026-02-25T00:44:23.0824465Z [36;1mnpm install pdfjs-dist@3.11.174 playwright[0m
-2026-02-25T00:44:23.1023802Z shell: /usr/bin/bash -e {0}
-2026-02-25T00:44:23.1024141Z ##[endgroup]
-2026-02-25T00:44:28.0214391Z npm warn deprecated inflight@1.0.6: This module is not supported, and leaks memory. Do not use it. Check out lru-cache if you want a good and tested way to coalesce async requests by a key value, which is much more comprehensive and powerful.
-2026-02-25T00:44:28.0673237Z npm warn deprecated are-we-there-yet@2.0.0: This package is no longer supported.
-2026-02-25T00:44:28.0736558Z npm warn deprecated npmlog@5.0.1: This package is no longer supported.
-2026-02-25T00:44:28.0871402Z npm warn deprecated gauge@3.0.2: This package is no longer supported.
-2026-02-25T00:44:28.0903513Z npm warn deprecated rimraf@3.0.2: Rimraf versions prior to v4 are no longer supported
-2026-02-25T00:44:28.1012269Z npm warn deprecated glob@7.2.3: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
-2026-02-25T00:44:28.1526076Z npm warn deprecated tar@6.2.1: Old versions of tar are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
-2026-02-25T00:44:30.1455888Z 
-2026-02-25T00:44:30.1456526Z added 67 packages in 7s
-2026-02-25T00:44:30.1456902Z 
-2026-02-25T00:44:30.1457215Z 6 packages are looking for funding
-2026-02-25T00:44:30.1457742Z   run `npm fund` for details
-2026-02-25T00:44:30.1800383Z ##[group]Run actions/cache@v4
-2026-02-25T00:44:30.1800656Z with:
-2026-02-25T00:44:30.1800839Z   path: ~/.cache/ms-playwright
-2026-02-25T00:44:30.1801093Z   key: playwright-chromium-Linux
-2026-02-25T00:44:30.1801347Z   restore-keys: playwright-chromium-
-2026-02-25T00:44:30.1801609Z   enableCrossOsArchive: false
-2026-02-25T00:44:30.1801840Z   fail-on-cache-miss: false
-2026-02-25T00:44:30.1802047Z   lookup-only: false
-2026-02-25T00:44:30.1802239Z   save-always: false
-2026-02-25T00:44:30.1802448Z ##[endgroup]
-2026-02-25T00:44:30.4198127Z Cache hit for: playwright-chromium-Linux
-2026-02-25T00:44:31.5862470Z Received 134217728 of 261314998 (51.4%), 123.8 MBs/sec
-2026-02-25T00:44:32.2896819Z Received 261314998 of 261314998 (100.0%), 143.4 MBs/sec
-2026-02-25T00:44:32.2924415Z Cache Size: ~249 MB (261314998 B)
-2026-02-25T00:44:32.2981283Z [command]/usr/bin/tar -xf /home/runner/work/_temp/c0776713-194e-41c1-89ce-d805212b52bb/cache.tzst -P -C /home/runner/work/Shooting-Dashboard/Shooting-Dashboard --use-compress-program unzstd
-2026-02-25T00:44:33.3786165Z Cache restored successfully
-2026-02-25T00:44:33.4356704Z Cache restored from key: playwright-chromium-Linux
-2026-02-25T00:44:33.4481894Z ##[group]Run npx playwright install chromium
-2026-02-25T00:44:33.4482263Z [36;1mnpx playwright install chromium[0m
-2026-02-25T00:44:33.4514934Z shell: /usr/bin/bash -e {0}
-2026-02-25T00:44:33.4515181Z ##[endgroup]
-2026-02-25T00:44:34.4857175Z ##[group]Run node scripts/fetch-shooting-data.js
-2026-02-25T00:44:34.4857547Z [36;1mnode scripts/fetch-shooting-data.js[0m
-2026-02-25T00:44:34.4889392Z shell: /usr/bin/bash -e {0}
-2026-02-25T00:44:34.4889630Z env:
-2026-02-25T00:44:34.4890497Z   ANTHROPIC_API_KEY: ***
-2026-02-25T00:44:34.4890727Z ##[endgroup]
-2026-02-25T00:44:34.5209578Z Starting all fetches in parallel...
-2026-02-25T00:44:34.5219370Z Detroit PDF URL: https://detroitmi.gov/sites/detroitmi.localhost/files/events/2026-02/260219%20DPD%20Stats.pdf
-2026-02-25T00:44:34.5524211Z Durham archive URL: https://www.durhamnc.gov/Archive.aspx?AMID=211
-2026-02-25T00:44:34.9027271Z Hampton: fetching JPEG from https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=
-2026-02-25T00:44:35.5869383Z 
-2026-02-25T00:44:35.5871190Z --- Detroit OK ---
-2026-02-25T00:44:35.5883901Z Detroit: {
-2026-02-25T00:44:35.5885298Z   ytd: 34,
-2026-02-25T00:44:35.5886743Z   prior: 50,
-2026-02-25T00:44:35.5892688Z   asof: '2026-02-19',
-2026-02-25T00:44:35.5893488Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:44:35.5893994Z   ok: true
-2026-02-25T00:44:35.5894325Z }
-2026-02-25T00:44:35.5962811Z Hampton: image size: 132318 bytes, type: image/jpeg
-2026-02-25T00:44:35.5999287Z Durham PDF URL: https://www.durhamnc.gov/ArchiveCenter/ViewFile/Item/7569 (ADID: 7569)
-2026-02-25T00:44:35.7321445Z Warning: TT: undefined function: 21
-2026-02-25T00:44:35.7504992Z Warning: TT: invalid function id: 136
-2026-02-25T00:44:35.7619901Z Durham asof: 2026-02-21
-2026-02-25T00:44:35.9726076Z Durham: rendered PDF to PNG, size: 213968 bytes
-2026-02-25T00:44:35.9766315Z Portland: loading Gun Violence Trends Report YTD sheet...
-2026-02-25T00:44:35.9839323Z Milwaukee: loading Tableau dashboard...
-2026-02-25T00:44:35.9839990Z MiamiDade: loading wrapper page...
-2026-02-25T00:44:35.9840594Z Memphis: loading Power BI dashboard...
-2026-02-25T00:44:35.9958792Z Buffalo: loading GIVE dashboard...
-2026-02-25T00:44:35.9961618Z Pittsburgh: loading Power BI dashboard...
-2026-02-25T00:44:36.0000295Z Nashville: loading dashboard...
-2026-02-25T00:44:36.4755504Z Hampton vision response: PRIOR=4 YTD=0 ASOF=2026-01-31
-2026-02-25T00:44:36.4794370Z 
-2026-02-25T00:44:36.4795025Z --- Hampton OK ---
-2026-02-25T00:44:36.4795786Z Hampton: {
-2026-02-25T00:44:36.4796344Z   ytd: 0,
-2026-02-25T00:44:36.4796871Z   prior: 4,
-2026-02-25T00:44:36.4797387Z   asof: '2026-01-31',
-2026-02-25T00:44:36.4798057Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:44:36.4798734Z   ok: true
-2026-02-25T00:44:36.4799259Z }
-2026-02-25T00:44:36.6691122Z Durham vision response: 2024=16 2025=20 2026=16
-2026-02-25T00:44:36.6734164Z 
-2026-02-25T00:44:36.6734866Z --- Durham OK ---
-2026-02-25T00:44:36.6739175Z Durham: {
-2026-02-25T00:44:36.6739796Z   ytd: 16,
-2026-02-25T00:44:36.6740284Z   prior: 20,
-2026-02-25T00:44:36.6740778Z   asof: '2026-02-21',
-2026-02-25T00:44:36.6741383Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:44:36.6742001Z   ok: true
-2026-02-25T00:44:36.6742717Z }
-2026-02-25T00:44:44.4414856Z Milwaukee asof: 2026-02-23
-2026-02-25T00:44:45.3970938Z Milwaukee: screenshot taken, size: 269718 bytes
-2026-02-25T00:44:46.4454161Z Milwaukee vision response: YTD2024=74 YTD2025=56 YTD2026=46
-2026-02-25T00:44:46.4475335Z 
-2026-02-25T00:44:46.4476126Z --- Milwaukee OK ---
-2026-02-25T00:44:46.4476914Z Milwaukee: {
-2026-02-25T00:44:46.4477471Z   ytd: 46,
-2026-02-25T00:44:46.4478002Z   prior: 56,
-2026-02-25T00:44:46.4478524Z   asof: '2026-02-23',
-2026-02-25T00:44:46.4479259Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:44:46.4479953Z   ok: true
-2026-02-25T00:44:46.4480583Z }
-2026-02-25T00:44:47.6781573Z MiamiDade iframe src: https://app.powerbigov.us/view?r=eyJrIjoiNDFkYmQ2ZDMtZmY1NS00OTllLWE4MDAtNDgxMTZiZWJhYTI4IiwidCI6ImZkZGUyYzg5LTM4MzgtNDVhMy1iMjcyLTZjZjA4OTc4NzAxZiJ9
-2026-02-25T00:44:47.6785236Z MiamiDade: loading Power BI embed directly...
-2026-02-25T00:44:47.9734428Z Nashville: page sample: © 2026 Mapbox© OpenStreetMap
-2026-02-25T00:44:47.9735618Z Offense Report Date
-2026-02-25T00:44:47.9736866Z This year
-2026-02-25T00:44:47.9737467Z Fatal or Non-Fatal
-2026-02-25T00:44:47.9738014Z Fatal
-2026-02-25T00:44:47.9738523Z Non-Fatal
-2026-02-25T00:44:47.9739077Z Fatal or Non-Fatal
-2026-02-25T00:44:47.9739596Z Fatal
-2026-02-25T00:44:47.9740087Z Non-Fatal
-2026-02-25T00:44:47.9740590Z 0
-2026-02-25T00:44:47.9741073Z 5
-2026-02-25T00:44:47.9741542Z 10
-2026-02-25T00:44:47.9742003Z 15
-2026-02-25T00:44:47.9742470Z 20
-2026-02-25T00:44:47.9742936Z 25
-2026-02-25T00:44:47.9743626Z 30
-2026-02-25T00:44:47.9744088Z Victim Race
-2026-02-25T00:44:47.9744882Z White
-2026-02-25T00:44:47.9745299Z Black
-2026-02-25T00:44:47.9745762Z Other
-2026-02-25T00:44:47.9746520Z 0
-2026-02-25T00:44:47.9747041Z 5
-2026-02-25T00:44:47.9747572Z 10
-2026-02-25T00:44:47.9748170Z 15
-2026-02-25T00:44:47.9748719Z 20
-2026-02-25T00:44:47.9749241Z Victim Gender
-2026-02-25T00:44:47.9765563Z Male
-2026-02-25T00:44:47.9765872Z Female
-2026-02-25T00:44:47.9766157Z 0
-2026-02-25T00:44:47.9766402Z 5
-2026-02-25T00:44:47.9766645Z 10
-2026-02-25T00:44:47.9766912Z 15
-2026-02-25T00:44:47.9767155Z 20
-2026-02-25T00:44:47.9767408Z 25
-2026-02-25T00:44:47.9767641Z 30
-2026-02-25T00:44:47.9767889Z Victim Age
-2026-02-25T00:44:47.9768167Z Under 18
-2026-02-25T00:44:47.9768443Z 18 to 30
-2026-02-25T00:44:47.9768704Z 31 to 45
-2026-02-25T00:44:47.9768973Z Over 45
-2026-02-25T00:44:47.9769251Z 0
-2026-02-25T00:44:47.9769498Z 2
-2026-02-25T00:44:47.9769749Z 4
-2026-02-25T00:44:47.9769993Z 6
-2026-02-25T00:44:47.9770236Z 8
-2026-02-25T00:44:47.9770482Z 10
-2026-02-25T00:44:47.9770730Z 12
-2026-02-25T00:44:47.9770996Z 14
-2026-02-25T00:44:47.9835927Z Nashville: current year download failed: Download toolbar button not found
-2026-02-25T00:44:47.9836865Z Nashville: switching filter to Last year...
-2026-02-25T00:44:47.9860459Z Nashville: date combo result: {"found":false,"all":[{"label":"Precinct, Zip, or Council District (All)","text":"(All)"}]}
-2026-02-25T00:44:48.1692469Z Portland: body sample: Year to Date & Rolling Year Statistics
-2026-02-25T00:44:48.1693541Z Year to Date Clearance & Annual Statistics
-2026-02-25T00:44:48.1694062Z Overall Shooting Graphs
-2026-02-25T00:44:48.1694465Z Firearm Homicide Graphs
-2026-02-25T00:44:48.1694850Z Non-Fatal Injury Graphs
-2026-02-25T00:44:48.1695234Z Non-Injury Graphs
-2026-02-25T00:44:48.1695553Z Clearance Graphs
-2026-02-25T00:44:48.1696002Z Shooting Incidents and Firearm Homicide Statistics
-2026-02-25T00:44:48.1696650Z Year to Date, Rolling Year and Annual Comparisons
-2026-02-25T00:44:48.1697164Z Year to Date Statistics
-2026-02-25T00:44:48.1697527Z Homicide Victims
-2026-02-25T00:44:48.1697923Z Homicides by Firearm Victims
-2026-02-25T00:44:48.1698402Z Homicides by Firearm Incidents
-2026-02-25T00:44:48.1698783Z Non-Fatal
-2026-02-25T00:44:48.1699279Z Portland: asof: null
-2026-02-25T00:44:48.1743713Z Portland: full text length: 1766
-2026-02-25T00:44:48.1744466Z Portland: line count: 59
-2026-02-25T00:44:48.1745254Z Portland line 3: Firearm Homicide Graphs
-2026-02-25T00:44:48.1746056Z Portland line 4: Non-Fatal Injury Graphs
-2026-02-25T00:44:48.1746859Z Portland line 7: Shooting Incidents and Firearm Homicide Statistics
-2026-02-25T00:44:48.1747599Z Portland line 10: Homicide Victims
-2026-02-25T00:44:48.1748193Z Portland line 11: Homicides by Firearm Victims
-2026-02-25T00:44:48.1748854Z Portland line 12: Homicides by Firearm Incidents
-2026-02-25T00:44:48.1749573Z Portland line 13: Non-Fatal Injury Shooting Incidents
-2026-02-25T00:44:48.1750233Z Portland line 15: Total Shooting Incidents
-2026-02-25T00:44:48.1750788Z Portland line 16: Current YTD Count
-2026-02-25T00:44:48.1751319Z Portland line 28: Homicide Victims
-2026-02-25T00:44:48.1751898Z Portland line 29: Homicides by Firearm Victims
-2026-02-25T00:44:48.1752539Z Portland line 30: Homicides by Firearm Incidents
-2026-02-25T00:44:48.1753457Z Portland line 31: Non-Fatal Injury Shooting Incidents
-2026-02-25T00:44:48.1754154Z Portland line 33: Total Shooting Incidents
-2026-02-25T00:44:48.1755866Z Portland line 48: Data Notes:  Homicides include Murder and Non-Negligent Manslaughter, Negligent Manslaughter with a Weapon, and Justifia
-2026-02-25T00:44:48.2348236Z 
-2026-02-25T00:44:48.2352845Z --- Portland FAILED: Portland: could not parse table values. homFirearm=null nfsi=null ---
-2026-02-25T00:44:49.9908185Z Nashville: Last year option: {"found":false,"items":["Fatal","Non-Fatal"]}
-2026-02-25T00:44:49.9909515Z Nashville: available options: ["Fatal","Non-Fatal"]
-2026-02-25T00:44:52.1518234Z Buffalo: clicking Shooting Activity tab...
-2026-02-25T00:44:52.7906911Z Memphis page1 sample: Show keyboard shortcuts
-2026-02-25T00:44:52.7919100Z Show screen reader tips
-2026-02-25T00:44:52.7919576Z Skip to main content
-2026-02-25T00:44:52.7920290Z Power BI Report
-2026-02-25T00:44:52.7920497Z 
-2026-02-25T00:44:52.7920775Z City of Memphis Safer Communities Dashboard
-2026-02-25T00:44:52.7921113Z 
-2026-02-25T00:44:52.7921548Z Figures are preliminary and subject to further review and analysis
-2026-02-25T00:44:52.7922046Z 
-2026-02-25T00:44:52.7922175Z Year
-2026-02-25T00:44:52.7922425Z 2026
-2026-02-25T00:44:52.7922705Z Crime Category
-2026-02-25T00:44:52.7923236Z All
-2026-02-25T00:44:52.7923535Z Part One/Two
-2026-02-25T00:44:52.7923820Z 1
-2026-02-25T00:44:52.7924086Z Precincts
-2026-02-25T00:44:52.7924359Z All
-2026-02-25T00:44:52.7924626Z Crime Overview
-2026-02-25T00:44:52.7924924Z Crime Summary
-2026-02-25T00:44:52.7925237Z Weekly Crime Trend
-2026-02-25T00:44:52.7925551Z Arrests
-2026-02-25T00:44:52.7925820Z Crash Map
-2026-02-25T00:44:52.7926104Z CVI Program Map
-2026-02-25T00:44:52.7926400Z 811
-2026-02-25T00:44:52.7926697Z Part 1 Violent Crimes
-2026-02-25T00:44:52.7927021Z 3546
-2026-02-25T00:44:52.7927325Z Total Group A Crimes
-2026-02-25T00:44:52.7927649Z 2735
-2026-02-25T00:44:52.7927910Z Part
-2026-02-25T00:44:52.7928253Z Memphis as-of: 2026-02-24
-2026-02-25T00:44:52.7928747Z Memphis: clicking Crime Summary tab...
-2026-02-25T00:44:53.9990929Z Nashville: prior year download failed: Download toolbar button not found
-2026-02-25T00:44:54.0621783Z 
-2026-02-25T00:44:54.0624491Z --- Nashville FAILED: Nashville: no current year CSV ---
-2026-02-25T00:44:57.5952849Z Memphis: clicking Non-Fatal Shooting...
-2026-02-25T00:45:00.2183333Z Buffalo: on Shooting Activity tab
-2026-02-25T00:45:00.2183934Z Buffalo: opening Jurisdiction dropdown...
-2026-02-25T00:45:00.2235990Z Buffalo: (All) count: 2
-2026-02-25T00:45:01.9665002Z Pittsburgh asof: 2026-02-24
-2026-02-25T00:45:01.9667719Z Pittsburgh page1 snippet: Show keyboard shortcuts
-2026-02-25T00:45:01.9668345Z Show screen reader tips
-2026-02-25T00:45:01.9668595Z Skip to main content
-2026-02-25T00:45:01.9668812Z Power BI Report
-2026-02-25T00:45:01.9668971Z 
-2026-02-25T00:45:01.9668978Z 
-2026-02-25T00:45:01.9668983Z 
-2026-02-25T00:45:01.9668990Z 
-2026-02-25T00:45:01.9669197Z Pittsburgh Bureau of Police Violent Crimes Dashboard
-2026-02-25T00:45:01.9669430Z 
-2026-02-25T00:45:01.9669539Z Year to Date Statistics
-2026-02-25T00:45:01.9669774Z Annual Statistics
-2026-02-25T00:45:01.9669967Z Timeline Trends
-2026-02-25T00:45:01.9670182Z Interactive Crime map
-2026-02-25T00:45:01.9670394Z Demographics
-2026-02-25T00:45:01.9670602Z Police Zone Map
-2026-02-25T00:45:01.9670719Z 
-2026-02-25T00:45:01.9670806Z    Last Updated: 
-2026-02-25T00:45:01.9670917Z 
-2026-02-25T00:45:01.9671030Z 2/24/2026 5:03:25 AM
-2026-02-25T00:45:01.9671220Z -
-2026-02-25T00:45:01.9671385Z +
-2026-02-25T00:45:01.9671537Z 98%
-2026-02-25T00:45:01.9671720Z Microsoft Power BI
-2026-02-25T00:45:01.9671908Z 1of7
-2026-02-25T00:45:01.9672083Z Report Zoomed To 98%
-2026-02-25T00:45:01.9672398Z Pittsburgh: navigating to Year to Date Stats page...
-2026-02-25T00:45:03.2586972Z Buffalo: jurisdiction dropdown opened
-2026-02-25T00:45:03.2588176Z Buffalo: deselecting all...
-2026-02-25T00:45:03.2672584Z Buffalo: (All) count after open: 3
-2026-02-25T00:45:03.7871189Z Memphis chart sample: Show keyboard shortcuts
-2026-02-25T00:45:03.7879510Z Show screen reader tips
-2026-02-25T00:45:03.7880062Z Skip to main content
-2026-02-25T00:45:03.7881905Z Power BI Report
-2026-02-25T00:45:03.7882451Z 
-2026-02-25T00:45:03.7882798Z City of Memphis Safer Communities Dashboard
-2026-02-25T00:45:03.7883427Z 
-2026-02-25T00:45:03.7884314Z Figures are preliminary and subject to further review and analysis
-2026-02-25T00:45:03.7884805Z 
-2026-02-25T00:45:03.7884938Z Crime Overview
-2026-02-25T00:45:03.7885277Z Crime Summary
-2026-02-25T00:45:03.7885792Z Weekly Crime Trend
-2026-02-25T00:45:03.7886161Z Arrests
-2026-02-25T00:45:03.7886452Z Crash Map
-2026-02-25T00:45:03.7886914Z CVI Program Map
-2026-02-25T00:45:03.7887242Z Murder
-2026-02-25T00:45:03.7887533Z Select a Year
-2026-02-25T00:45:03.7887875Z 2021
-2026-02-25T00:45:03.7888152Z 2022
-2026-02-25T00:45:03.7888767Z 2023
-2026-02-25T00:45:03.7889064Z 2024
-2026-02-25T00:45:03.7889325Z 2025
-2026-02-25T00:45:03.7889589Z 2026
-2026-02-25T00:45:03.7890294Z Aggravated Assault
-2026-02-25T00:45:03.7890713Z Non-Fatal Shooting Incidents
-2026-02-25T00:45:03.7891190Z 2026: 702025: 97 (-27.84%)
-2026-02-25T00:45:03.7891551Z Sexual Assault
-2026-02-25T00:45:03.7891753Z 0
-2026-02-25T00:45:03.7892011Z 50
-2026-02-25T00:45:03.7892312Z 100
-2026-02-25T00:45:03.7892569Z 150
-2026-02-25T00:45:03.7892868Z Year To Date
-2026-02-25T00:45:03.7893352Z 2021
-2026-02-25T00:45:03.7893775Z 2022
-2026-02-25T00:45:03.7894394Z 2023
-2026-02-25T00:45:03.7894689Z 2024
-2026-02-25T00:45:03.7894953Z 2025
-2026-02-25T00:45:03.7895223Z 2026
-2026-02-25T00:45:03.7895489Z 50
-2026-02-25T00:45:03.7895744Z 70
-2026-02-25T00:45:03.7895991Z 144
-2026-02-25T00:45:03.7896242Z 97
-2026-02-25T00:45:03.7896494Z 130
-2026-02-25T00:45:03.7896754Z 121
-2026-02-25T00:45:03.7897009Z Robbery
-2026-02-25T00:45:03.7897332Z Select a Police Precinct
-2026-02-25T00:45:03.7897712Z 995
-2026-02-25T00:45:03.7897990Z Austin
-2026-02-25T00:45:03.7898269Z Peay
-2026-02-25T00:45:03.7898519Z Raines
-2026-02-25T00:45:03.7898785Z Station
-2026-02-25T00:45:03.7899062Z Mt. Moriah
-2026-02-25T00:45:03.7899347Z Crump
-2026-02-25T00:45:03.7899604Z Tillman
-2026-02-25T00:45:03.7899865Z North Main
-2026-02-25T00:45:03.7900139Z A
-2026-02-25T00:45:03.8457591Z Memphis ytdMatch: undefined priorMatch: undefined
-2026-02-25T00:45:03.8457896Z 
-2026-02-25T00:45:03.8458008Z --- Memphis OK ---
-2026-02-25T00:45:03.8458258Z Memphis: {
-2026-02-25T00:45:03.8458440Z   ytd: 70,
-2026-02-25T00:45:03.8458618Z   prior: 97,
-2026-02-25T00:45:03.8458801Z   asof: '2026-02-24',
-2026-02-25T00:45:03.8459180Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:45:03.8459636Z   ok: true
-2026-02-25T00:45:03.8459821Z }
-2026-02-25T00:45:04.2864895Z Buffalo: deselected all
-2026-02-25T00:45:04.2865623Z Buffalo: selecting Buffalo City PD...
-2026-02-25T00:45:05.3185069Z Buffalo: selected Buffalo City PD
-2026-02-25T00:45:05.3185759Z Buffalo: clicking Apply...
-2026-02-25T00:45:09.3278757Z MiamiDade PBI page1 sample: Show keyboard shortcuts
-2026-02-25T00:45:09.3279508Z Show screen reader tips
-2026-02-25T00:45:09.3279932Z Skip to main content
-2026-02-25T00:45:09.3280307Z Power BI Report
-2026-02-25T00:45:09.3280517Z 
-2026-02-25T00:45:09.3281065Z MIAMI-DADE SHERIFF´S OFFICE   
-2026-02-25T00:45:09.3281363Z 
-2026-02-25T00:45:09.3281567Z NIBRS CRIME DATA DASHBOARD   
-2026-02-25T00:45:09.3281847Z 
-2026-02-25T00:45:09.3281858Z 
-2026-02-25T00:45:09.3281905Z 
-2026-02-25T00:45:09.3281916Z 
-2026-02-25T00:45:09.3284164Z This dashboard was developed to encourage openness and strengthen communication with the public. Leveraging data and analytics more effectively is a key priority for Sheriff Rosie as part of her ongoing efforts to increase transparency and accountability.
-2026-02-25T00:45:09.3286037Z 
-2026-02-25T00:45:09.3286047Z 
-2026-02-25T00:45:09.3286056Z 
-2026-02-25T00:45:09.3286072Z 
-2026-02-25T00:45:09.3288410Z The Miami-Dade Sheriff’s Office is committed to transparency and community safety. Our Crime-Data Dashboard provides the public with accurate, up-to-date crime statistics for our jurisdict
-2026-02-25T00:45:09.3289934Z MiamiDade asof: null
-2026-02-25T00:45:09.3290416Z MiamiDade: navigating to page 3...
-2026-02-25T00:45:10.4937668Z Pittsburgh: navigated via .pbi-glyph-chevronrightmedium
-2026-02-25T00:45:10.4954402Z Pittsburgh post-nav snippet: Show keyboard shortcuts
-2026-02-25T00:45:10.4955137Z Show screen reader tips
-2026-02-25T00:45:10.4956120Z Skip to main content
-2026-02-25T00:45:10.4956596Z Power BI Report
-2026-02-25T00:45:10.4956834Z 
-2026-02-25T00:45:10.4956989Z Last Updated:
-2026-02-25T00:45:10.4957215Z 
-2026-02-25T00:45:10.4957397Z 2/24/2026 5:03:25 AM
-2026-02-25T00:45:10.4957794Z Year to Date Stats
-2026-02-25T00:45:10.4958027Z Annual Stats
-2026-02-25T00:45:10.4958233Z Timeline Trends
-2026-02-25T00:45:10.4958474Z Interactive Crime Map
-2026-02-25T00:45:10.4958725Z Demographics
-2026-02-25T00:45:10.4959100Z Police Zone Map
-2026-02-25T00:45:10.4959647Z Scroll up
-2026-02-25T00:45:10.4959841Z Scroll down
-2026-02-25T00:45:10.4960040Z Scroll left
-2026-02-25T00:45:10.4960237Z Scroll right
-2026-02-25T00:45:10.4960445Z Row Selection
-2026-02-25T00:45:10.4960647Z Year
-2026-02-25T00:45:10.4961029Z  
-2026-02-25T00:45:10.4961249Z Number of Homicides
-2026-02-25T00:45:10.4961480Z YTD % Difference
-2026-02-25T00:45:10.4961694Z Select Row
-2026-02-25T00:45:10.4961879Z 2026
-2026-02-25T00:45:10.4962030Z 4
-2026-02-25T00:45:10.4962188Z -33.33%
-2026-02-25T00:45:10.4962370Z Select Row
-2026-02-25T00:45:10.4962641Z 2025
-2026-02-25T00:45:10.4962920Z 6
-2026-02-25T00:45:10.4963441Z -14.29%
-2026-02-25T00:45:10.4963750Z Select Row
-2026-02-25T00:45:10.4964052Z 2024
-2026-02-25T00:45:10.4964336Z 7
-2026-02-25T00:45:10.4964620Z -36.
-2026-02-25T00:45:10.5483636Z Pittsburgh fallback rows: 2026=4, 2025=6, 2024=7, 2023=11, 2022=7, 2021=7, 2020=6, 2019=4, 2026=6, 2025=6, 2024=12, 2023=12, 2022=16, 2021=14, 2020=9, 2019=16
-2026-02-25T00:45:10.5484925Z Pittsburgh parsed: hom2026=4 nfs2026=6 hom2025=6 nfs2025=6
-2026-02-25T00:45:10.5485383Z 
-2026-02-25T00:45:10.5485549Z --- Pittsburgh OK ---
-2026-02-25T00:45:10.5485906Z Pittsburgh: {
-2026-02-25T00:45:10.5486196Z   ytd: 10,
-2026-02-25T00:45:10.5486483Z   prior: 12,
-2026-02-25T00:45:10.5486782Z   asof: '2026-02-24',
-2026-02-25T00:45:10.5487182Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:45:10.5487595Z   ok: true
-2026-02-25T00:45:10.5487867Z }
-2026-02-25T00:45:11.3404517Z Buffalo: applied filter
-2026-02-25T00:45:11.3405280Z Buffalo: clicking Monthly Data...
-2026-02-25T00:45:14.5773863Z MiamiDade: clicked next (1/2)
-2026-02-25T00:45:19.3602652Z Buffalo: switched to Monthly Data
-2026-02-25T00:45:19.3603565Z Buffalo: clicking Download toolbar button...
-2026-02-25T00:45:20.1283898Z MiamiDade: clicked next (2/2)
-2026-02-25T00:45:20.1303723Z MiamiDade page3 sample: Show keyboard shortcuts
-2026-02-25T00:45:20.1304297Z Show screen reader tips
-2026-02-25T00:45:20.1304677Z Skip to main content
-2026-02-25T00:45:20.1305036Z Power BI Report
-2026-02-25T00:45:20.1305274Z 
-2026-02-25T00:45:20.1305468Z NIBRS CRIME DATA DASHBOARD   
-2026-02-25T00:45:20.1305766Z 
-2026-02-25T00:45:20.1306248Z MIAMI-DADE SHERIFF´S OFFICE  
-2026-02-25T00:45:20.1306534Z 
-2026-02-25T00:45:20.1306782Z Last update data: 02/20/2026 01:00 PM
-2026-02-25T00:45:20.1307188Z  
-2026-02-25T00:45:20.1307334Z 
-2026-02-25T00:45:20.1307476Z Homicides - YTD
-2026-02-25T00:45:20.1307670Z 
-2026-02-25T00:45:20.1307827Z Violent Crime- YTD
-2026-02-25T00:45:20.1308029Z 
-2026-02-25T00:45:20.1308178Z Shootings- YTD
-2026-02-25T00:45:20.1308372Z 
-2026-02-25T00:45:20.1308529Z Property Crime- YTD
-2026-02-25T00:45:20.1308738Z 
-2026-02-25T00:45:20.1308849Z 4
-2026-02-25T00:45:20.1309137Z 573
-2026-02-25T00:45:20.1309408Z 15
-2026-02-25T00:45:20.1309691Z 1,887
-2026-02-25T00:45:20.1309859Z 
-2026-02-25T00:45:20.1310021Z LYTD | %DIFF | DIFF
-2026-02-25T00:45:20.1310247Z 
-2026-02-25T00:45:20.1310256Z 
-2026-02-25T00:45:20.1310263Z 
-2026-02-25T00:45:20.1310271Z 
-2026-02-25T00:45:20.1310515Z ↙ 6 |-33.3%|-02
-2026-02-25T00:45:20.1310894Z  
-2026-02-25T00:45:20.1311059Z 
-2026-02-25T00:45:20.1311286Z LYTD | %DIFF | DIFF
-2026-02-25T00:45:20.1311464Z 
-2026-02-25T00:45:20.1311468Z 
-2026-02-25T00:45:20.1311473Z 
-2026-02-25T00:45:20.1311478Z 
-2026-02-25T00:45:20.1311597Z ↙ 623 |-8.0%|-50
-2026-02-25T00:45:20.1311868Z  
-2026-02-25T00:45:20.1312018Z 
-2026-02-25T00:45:20.1312161Z LYTD | %DIFF | DIFF
-2026-02-25T00:45:20.1312359Z 
-2026-02-25T00:45:20.1312367Z 
-2026-02-25T00:45:20.1312386Z 
-2026-02-25T00:45:20.1312395Z 
-2026-02-25T00:45:20.1312916Z ↙ 26 |-42.3%|-11
-2026-02-25T00:45:20.1313424Z  
-2026-02-25T00:45:20.1313576Z 
-2026-02-25T00:45:20.1313777Z LYTD | %DIFF | DIFF
-2026-02-25T00:45:20.1313980Z 
-2026-02-25T00:45:20.1313988Z 
-2026-02-25T00:45:20.1313995Z 
-2026-02-25T00:45:20.1314002Z 
-2026-02-25T00:45:20.1314237Z ↙ 2781 |-32.1%|-894
-2026-02-25T00:45:20.1314535Z  
-2026-02-25T00:45:20.1314845Z Year-To-Date Crime (YTD)
-2026-02-25T00:45:20.1315203Z Jan 01 to Feb 20
-2026-02-25T00:45:20.1315522Z Scroll up
-2026-02-25T00:45:20.1315811Z Scroll down
-2026-02-25T00:45:20.1316354Z Scroll left
-2026-02-25T00:45:20.1316629Z Scroll right
-2026-02-25T00:45:20.1316902Z Year
-2026-02-25T00:45:20.1317162Z 2026
-2026-02-25T00:45:20.1317401Z 2026
-2026-02-25T00:45:20.1317639Z 2025
-2026-02-25T00:45:20.1317869Z 2025
-2026-02-25T00:45:20.1318112Z 2024
-2026-02-25T00:45:20.1318317Z 2024
-2026-02-25T00:45:20.1318588Z 2023
-2026-02-25T00:45:20.1318812Z 2023
-2026-02-25T00:45:20.1318965Z 2022
-2026-02-25T00:45:20.1319113Z 2022
-2026-02-25T00:45:20.1319359Z Crime Type
-2026-02-25T00:45:20.1320306Z  
-2026-02-25T00:45:20.1320608Z # Crime
-2026-02-25T00:45:20.1320945Z  
-2026-02-25T00:45:20.1321208Z %
-2026-02-25T00:45:20.1321491Z  
-2026-02-25T00:45:20.1321742Z # Crime
-2026-02-25T00:45:20.1322045Z  
-2026-02-25T00:45:20.1322286Z %
-2026-02-25T00:45:20.1322583Z  
-2026-02-25T00:45:20.1322848Z # Crime
-2026-02-25T00:45:20.1324163Z  
-2026-02-25T00:45:20.1324449Z %
-2026-02-25T00:45:20.1324760Z  
-2026-02-25T00:45:20.1325008Z # Crime
-2026-02-25T00:45:20.1325301Z  
-2026-02-25T00:45:20.1325578Z %
-2026-02-25T00:45:20.1325915Z  
-2026-02-25T00:45:20.1326184Z # Crime
-2026-02-25T00:45:20.1326496Z  
-2026-02-25T00:45:20.1326747Z %
-2026-02-25T00:45:20.1362186Z  
-2026-02-25T00:45:20.1362481Z HOMICIDES
-2026-02-25T00:45:20.1362948Z 4
-2026-02-25T00:45:20.1363344Z -33%
-2026-02-25T00:45:20.1363595Z 6
-2026-02-25T00:45:20.1363852Z -45%
-2026-02-25T00:45:20.1364116Z 11
-2026-02-25T00:45:20.1364368Z -31%
-2026-02-25T00:45:20.1364618Z 16
-2026-02-25T00:45:20.1364857Z 45%
-2026-02-25T00:45:20.1365100Z 11
-2026-02-25T00:45:20.1365414Z  
-2026-02-25T00:45:20.1365669Z VIOLENT CRIME
-2026-02-25T00:45:20.1365947Z 573
-2026-02-25T00:45:20.1366180Z -8%
-2026-02-25T00:45:20.1366427Z 623
-2026-02-25T00:45:20.1366677Z -20%
-2026-02-25T00:45:20.1366940Z 778
-2026-02-25T00:45:20.1367181Z -22%
-2026-02-25T00:45:20.1367417Z 998
-2026-02-25T00:45:20.1367661Z 15%
-2026-02-25T00:45:20.1367904Z 869
-2026-02-25T00:45:20.1368180Z  
-2026-02-25T00:45:20.1368432Z SHOOTINGS
-2026-02-25T00:45:20.1368683Z 15
-2026-02-25T00:45:20.1368922Z -42%
-2026-02-25T00:45:20.1369181Z 26
-2026-02-25T00:45:20.1369419Z -7%
-2026-02-25T00:45:20.1369656Z 28
-2026-02-25T00:45:20.1369883Z -46%
-2026-02-25T00:45:20.1370122Z 52
-2026-02-25T00:45:20.1370363Z 44%
-2026-02-25T00:45:20.1370613Z 36
-2026-02-25T00:45:20.1370889Z  
-2026-02-25T00:45:20.1371151Z PROPERTY CRIME
-2026-02-25T00:45:20.1371448Z 1,887
-2026-02-25T00:45:20.1371708Z -32%
-2026-02-25T00:45:20.1371962Z 2,781
-2026-02-25T00:45:20.1372213Z -6%
-2026-02-25T00:45:20.1372455Z 2,969
-2026-02-25T00:45:20.1372711Z 1%
-2026-02-25T00:45:20.1372975Z 2,931
-2026-02-25T00:45:20.1373383Z 3%
-2026-02-25T00:45:20.1373632Z 2,847
-2026-02-25T00:45:20.1373909Z  
-2026-02-25T00:45:20.1374197Z Full Year Crime (FY)
-2026-02-25T00:45:20.1374519Z Jan 01 to Dec 31
-2026-02-25T00:45:20.1374813Z Scroll up
-2026-02-25T00:45:20.1375082Z Scroll down
-2026-02-25T00:45:20.1375342Z Scroll left
-2026-02-25T00:45:20.1375605Z Scroll right
-2026-02-25T00:45:20.1375876Z Year
-2026-02-25T00:45:20.1376122Z 2025
-2026-02-25T00:45:20.1376360Z 2025
-2026-02-25T00:45:20.1376594Z 2024
-2026-02-25T00:45:20.1376853Z 2024
-2026-02-25T00:45:20.1377106Z 20
-2026-02-25T00:45:20.1820691Z MiamiDade asof from page3: 2026-02-20
-2026-02-25T00:45:20.1822669Z MiamiDade shootings nums: 
-2026-02-25T00:45:20.1827513Z MiamiDade line-scan shootings: [ 15, 26 ]
-2026-02-25T00:45:20.1828118Z MiamiDade parsed: ytd=15 prior=26
-2026-02-25T00:45:20.1828427Z 
-2026-02-25T00:45:20.1828592Z --- MiamiDade OK ---
-2026-02-25T00:45:20.1829745Z MiamiDade: {
-2026-02-25T00:45:20.1830054Z   ytd: 15,
-2026-02-25T00:45:20.1830683Z   prior: 26,
-2026-02-25T00:45:20.1831000Z   asof: '2026-02-20',
-2026-02-25T00:45:20.1831407Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:45:20.1831821Z   ok: true
-2026-02-25T00:45:20.1832090Z }
-2026-02-25T00:45:21.4021764Z Buffalo: download menu opened
-2026-02-25T00:45:21.4022305Z Buffalo: clicking Crosstab...
-2026-02-25T00:45:23.4239703Z Buffalo: crosstab dialog opened
-2026-02-25T00:45:23.4240597Z Buffalo: selecting Monthly Total Overview...
-2026-02-25T00:45:24.4415790Z Buffalo: selected Monthly Total Overview
-2026-02-25T00:45:24.4416744Z Buffalo: selecting CSV...
-2026-02-25T00:45:24.9659210Z Buffalo: CSV selected
-2026-02-25T00:45:24.9659908Z Buffalo: clicking Download button...
-2026-02-25T00:45:25.3930590Z Buffalo: CSV downloaded, bytes: 33092
-2026-02-25T00:45:25.3931188Z Buffalo: CSV preview: Month of YM (ascending)	Shooting Category	Count
-2026-02-25T00:45:25.3931702Z Jan-21	Shooting Incidents Involving Injury	78
-2026-02-25T00:45:25.3932125Z Jan-21	Shooting Incidents Involving Injury	78
-2026-02-25T00:45:25.3932818Z Jan-21	Shooting Victims (Persons Hit)	90
-2026-02-25T00:45:25.3933497Z Jan-21	Shooting
-2026-02-25T00:45:25.4282026Z Buffalo: total rows: 367 | janCurr: Jan-26 | janPrior: Jan-25
-2026-02-25T00:45:25.4290681Z Buffalo parsed: victimsYtd=34 killedYtd=5 victimsPrior=38 killedPrior=10
-2026-02-25T00:45:25.4291293Z 
-2026-02-25T00:45:25.4291792Z --- Buffalo OK ---
-2026-02-25T00:45:25.4292242Z Buffalo: {
-2026-02-25T00:45:25.4292546Z   ytd: 39,
-2026-02-25T00:45:25.4292844Z   prior: 48,
-2026-02-25T00:45:25.4293436Z   asof: '2026-01-31',
-2026-02-25T00:45:25.4293936Z   fetchedAt: '2026-02-25T00:44:34.518Z',
-2026-02-25T00:45:25.4294437Z   ok: true
-2026-02-25T00:45:25.4294749Z }
-2026-02-25T00:45:25.4295483Z 
-2026-02-25T00:45:25.4296083Z Wrote /home/runner/work/Shooting-Dashboard/Shooting-Dashboard/data/manual-auto.json
-2026-02-25T00:45:25.4296912Z {
-2026-02-25T00:45:25.4297280Z   "omaha": {
-2026-02-25T00:45:25.4297602Z     "ytd": 2,
-2026-02-25T00:45:25.4297975Z     "prior": 8,
-2026-02-25T00:45:25.4298404Z     "asof": "2026-02-04",
-2026-02-25T00:45:25.4298917Z     "fetchedAt": "2026-02-23T02:03:22.801Z",
-2026-02-25T00:45:25.4299436Z     "ok": true
-2026-02-25T00:45:25.4299791Z   },
-2026-02-25T00:45:25.4300154Z   "detroit": {
-2026-02-25T00:45:25.4300744Z     "ytd": 34,
-2026-02-25T00:45:25.4301120Z     "prior": 50,
-2026-02-25T00:45:25.4301392Z     "asof": "2026-02-19",
-2026-02-25T00:45:25.4301677Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4301946Z     "ok": true
-2026-02-25T00:45:25.4302123Z   },
-2026-02-25T00:45:25.4302305Z   "durham": {
-2026-02-25T00:45:25.4302484Z     "ytd": 16,
-2026-02-25T00:45:25.4302669Z     "prior": 20,
-2026-02-25T00:45:25.4302862Z     "asof": "2026-02-21",
-2026-02-25T00:45:25.4303333Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4303600Z     "ok": true
-2026-02-25T00:45:25.4303774Z   },
-2026-02-25T00:45:25.4303945Z   "milwaukee": {
-2026-02-25T00:45:25.4304125Z     "ytd": 46,
-2026-02-25T00:45:25.4304293Z     "prior": 56,
-2026-02-25T00:45:25.4304491Z     "asof": "2026-02-23",
-2026-02-25T00:45:25.4304743Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4304994Z     "ok": true
-2026-02-25T00:45:25.4305170Z   },
-2026-02-25T00:45:25.4305336Z   "memphis": {
-2026-02-25T00:45:25.4305505Z     "ytd": 70,
-2026-02-25T00:45:25.4305684Z     "prior": 97,
-2026-02-25T00:45:25.4305872Z     "asof": "2026-02-24",
-2026-02-25T00:45:25.4306125Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4306374Z     "ok": true
-2026-02-25T00:45:25.4306533Z   },
-2026-02-25T00:45:25.4306707Z   "hampton": {
-2026-02-25T00:45:25.4306879Z     "ytd": 0,
-2026-02-25T00:45:25.4307053Z     "prior": 4,
-2026-02-25T00:45:25.4307238Z     "asof": "2026-01-31",
-2026-02-25T00:45:25.4307477Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4307720Z     "ok": true
-2026-02-25T00:45:25.4307891Z   },
-2026-02-25T00:45:25.4308052Z   "miamidade": {
-2026-02-25T00:45:25.4308232Z     "ytd": 15,
-2026-02-25T00:45:25.4308402Z     "prior": 26,
-2026-02-25T00:45:25.4308795Z     "asof": "2026-02-20",
-2026-02-25T00:45:25.4309047Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4309285Z     "ok": true
-2026-02-25T00:45:25.4309448Z   },
-2026-02-25T00:45:25.4309611Z   "pittsburgh": {
-2026-02-25T00:45:25.4309789Z     "ytd": 10,
-2026-02-25T00:45:25.4309966Z     "prior": 12,
-2026-02-25T00:45:25.4310146Z     "asof": "2026-02-24",
-2026-02-25T00:45:25.4310397Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4310642Z     "ok": true
-2026-02-25T00:45:25.4310809Z   },
-2026-02-25T00:45:25.4311108Z   "portland": {
-2026-02-25T00:45:25.4311288Z     "ok": false,
-2026-02-25T00:45:25.4311640Z     "error": "Portland: could not parse table values. homFirearm=null nfsi=null",
-2026-02-25T00:45:25.4312056Z     "fetchedAt": "2026-02-25T00:44:34.518Z"
-2026-02-25T00:45:25.4312300Z   },
-2026-02-25T00:45:25.4312456Z   "buffalo": {
-2026-02-25T00:45:25.4312632Z     "ytd": 39,
-2026-02-25T00:45:25.4312801Z     "prior": 48,
-2026-02-25T00:45:25.4312986Z     "asof": "2026-01-31",
-2026-02-25T00:45:25.4313505Z     "fetchedAt": "2026-02-25T00:44:34.518Z",
-2026-02-25T00:45:25.4313759Z     "ok": true
-2026-02-25T00:45:25.4313921Z   },
-2026-02-25T00:45:25.4314084Z   "nashville": {
-2026-02-25T00:45:25.4314263Z     "ok": false,
-2026-02-25T00:45:25.4314490Z     "error": "Nashville: no current year CSV",
-2026-02-25T00:45:25.4314788Z     "fetchedAt": "2026-02-25T00:44:34.518Z"
-2026-02-25T00:45:25.4315018Z   }
-2026-02-25T00:45:25.4315175Z }
-2026-02-25T00:46:34.9189990Z ##[group]Run git config user.name "github-actions[bot]"
-2026-02-25T00:46:34.9190431Z [36;1mgit config user.name "github-actions[bot]"[0m
-2026-02-25T00:46:34.9190859Z [36;1mgit config user.email "github-actions[bot]@users.noreply.github.com"[0m
-2026-02-25T00:46:34.9191266Z [36;1mgit add data/manual-auto.json[0m
-2026-02-25T00:46:34.9191766Z [36;1mgit diff --staged --quiet || git commit -m "Auto-update shooting data [$(date -u '+%Y-%m-%d %H:%M UTC')]"[0m
-2026-02-25T00:46:34.9192263Z [36;1mgit push[0m
-2026-02-25T00:46:34.9223638Z shell: /usr/bin/bash -e {0}
-2026-02-25T00:46:34.9223879Z ##[endgroup]
-2026-02-25T00:46:34.9426946Z [main 2f2e745] Auto-update shooting data [2026-02-25 00:46 UTC]
-2026-02-25T00:46:34.9427703Z  1 file changed, 16 insertions(+), 11 deletions(-)
-2026-02-25T00:46:35.4137729Z To https://github.com/AH-Datalytics/Shooting-Dashboard
-2026-02-25T00:46:35.4138248Z    bb7ac10..2f2e745  main -> main
-2026-02-25T00:46:35.4242352Z Post job cleanup.
-2026-02-25T00:46:35.5574148Z Cache hit occurred on the primary key playwright-chromium-Linux, not saving cache.
-2026-02-25T00:46:35.5669311Z Post job cleanup.
-2026-02-25T00:46:35.7342449Z Post job cleanup.
-2026-02-25T00:46:35.8293391Z [command]/usr/bin/git version
-2026-02-25T00:46:35.8329257Z git version 2.52.0
-2026-02-25T00:46:35.8372513Z Temporarily overriding HOME='/home/runner/work/_temp/a755c8c8-1f33-4b70-bd1d-4cc78f690835' before making global git config changes
-2026-02-25T00:46:35.8374367Z Adding repository directory to the temporary git global config as a safe directory
-2026-02-25T00:46:35.8379472Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/Shooting-Dashboard/Shooting-Dashboard
-2026-02-25T00:46:35.8422655Z [command]/usr/bin/git config --local --name-only --get-regexp core\.sshCommand
-2026-02-25T00:46:35.8455870Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :"
-2026-02-25T00:46:35.8689884Z [command]/usr/bin/git config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
-2026-02-25T00:46:35.8714309Z http.https://github.com/.extraheader
-2026-02-25T00:46:35.8727519Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader
-2026-02-25T00:46:35.8761988Z [command]/usr/bin/git submodule foreach --recursive sh -c "git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :"
-2026-02-25T00:46:35.9005393Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\.gitdir:
-2026-02-25T00:46:35.9039978Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url
-2026-02-25T00:46:35.9397894Z Cleaning up orphan processes
+/**
+ * fetch-shooting-data.js
+ * Runs via GitHub Actions to fetch blocked city data server-side
+ * and write results to data/manual-auto.json
+ */
+
+const https = require('https');
+const http  = require('http');
+const fs    = require('fs');
+const path  = require('path');
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function fetchUrl(targetUrl, timeoutMs = 20000) {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(targetUrl);
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const options = {
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; ShootingDashboard/1.0)' },
+      timeout: timeoutMs,
+    };
+    const req = lib.request(options, (res) => {
+      if ([301,302,303,307,308].includes(res.statusCode) && res.headers.location) {
+        const redirect = res.headers.location.startsWith('http')
+          ? res.headers.location
+          : parsed.origin + res.headers.location;
+        return fetchUrl(redirect, timeoutMs).then(resolve).catch(reject);
+      }
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) }));
+      res.on('error', reject);
+    });
+    req.on('timeout', () => { req.destroy(); reject(new Error('Timeout')); });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+// ─── PDF parsing ──────────────────────────────────────────────────────────────
+
+async function extractPdfTokens(buffer, pageNum = 1) {
+  // pdfjs-dist is installed at repo root (node_modules/)
+  let pdfjsLib;
+  try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
+  catch(e) { pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(buffer) }).promise;
+  const page = await pdf.getPage(pageNum);
+  const tc = await page.getTextContent();
+  const raw = tc.items.map(i => i.str).filter(s => s.length > 0);
+
+  // Collapse runs of single characters caused by custom font encoding
+  // e.g. ['N','o','n','-','F','a','t','a','l'] -> ['Non-Fatal']
+  const merged = [];
+  let run = '';
+  for (const tok of raw) {
+    if (tok.length === 1 && tok.trim().length > 0) {
+      run += tok;
+    } else {
+      if (run.length > 0) { merged.push(run.trim()); run = ''; }
+      const t = tok.trim();
+      if (t.length > 0) merged.push(t);
+    }
+  }
+  if (run.length > 0) merged.push(run.trim());
+
+  // Further pass: re-split merged tokens on whitespace in case multiple words merged
+  const tokens = [];
+  for (const t of merged) {
+    const parts = t.split(/\s+/).filter(p => p.length > 0);
+    tokens.push(...parts);
+  }
+  return tokens;
+}
+
+// ─── Detroit ──────────────────────────────────────────────────────────────────
+
+async function fetchDetroit() {
+  // Find most recent Thursday
+  const d = new Date();
+  const day = d.getDay();
+  const daysBack = day >= 4 ? day - 4 : day + 3;
+  d.setDate(d.getDate() - daysBack);
+  const yyyy = d.getFullYear();
+  const mm   = String(d.getMonth()+1).padStart(2,'0');
+  const dd   = String(d.getDate()).padStart(2,'0');
+  const yy   = String(yyyy).slice(2);
+  const pdfUrl = `https://detroitmi.gov/sites/detroitmi.localhost/files/events/${yyyy}-${mm}/${yy}${mm}${dd}%20DPD%20Stats.pdf`;
+
+  console.log('Detroit PDF URL:', pdfUrl);
+  const resp = await fetchUrl(pdfUrl);
+  if (resp.status !== 200) throw new Error(`Detroit PDF HTTP ${resp.status}`);
+
+  const tokens = await extractPdfTokens(resp.body);
+  const text = tokens.join(' ');
+
+  // Date - try text first, fall back to URL filename (YYMMDD e.g. 260219 = 2026-02-19)
+  const dateMatch = text.match(/\w+day,\s+(\w+)\s+(\d{1,2}),\s+(\d{4})/i);
+  let asof = null;
+  if (dateMatch) {
+    const months = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+    const mo = months[dateMatch[1].toLowerCase()];
+    asof = `${dateMatch[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dateMatch[2])).padStart(2,'0')}`;
+  }
+  if (!asof) {
+    const fnMatch = pdfUrl.match(/\/(\d{2})(\d{2})(\d{2})%20DPD/);
+    if (fnMatch) asof = `20${fnMatch[1]}-${fnMatch[2]}-${fnMatch[3]}`;
+  }
+
+  // Join all tokens and search for Non-Fatal Shooting row
+  // Tokens may be partially merged so search the joined string
+  const joined = tokens.join(' ');
+  const nfsMatch = joined.match(/Non.?Fatal\s*Shooting[\s\S]*?(?=\w+Homicide|\w+Sex|\w+Assault|\w+Robbery|\w+Burglary|$)/i);
+  if (!nfsMatch) throw new Error('Non-Fatal Shooting row not found. Tokens: ' + tokens.slice(0,60).join('|'));
+
+  // Extract all numbers from the matched section
+  const nums = [];
+  const numMatches = nfsMatch[0].matchAll(/-?[\d,]+(?:\.\d+)?/g);
+  for (const m of numMatches) {
+    const n = parseFloat(m[0].replace(/,/g, ''));
+    if (!isNaN(n) && Number.isInteger(n)) nums.push(n);
+  }
+  if (nums.length < 4) throw new Error(`Not enough numbers after Non-Fatal Shooting: ${nums.join(',')}`);
+
+  // Layout: priorDay, prior7Days, ytd_current, ytd_prior
+  return { ytd: nums[2], prior: nums[3], asof };
+}
+
+// ─── Durham ───────────────────────────────────────────────────────────────────
+
+async function fetchDurham() {
+  // Durham PDF contains an image-based bar chart - render via pdfjs + canvas, send to Claude vision
+  const archiveUrl = 'https://www.durhamnc.gov/Archive.aspx?AMID=211';
+  console.log('Durham archive URL:', archiveUrl);
+  const archResp = await fetchUrl(archiveUrl);
+  if (archResp.status !== 200) throw new Error(`Durham archive HTTP ${archResp.status}`);
+
+  const html = archResp.body.toString('utf8');
+  const adidMatches = [...html.matchAll(/ADID=(\d+)/g)].map(m => parseInt(m[1]));
+  if (!adidMatches.length) throw new Error('No ADID links found');
+  const latestAdid = Math.max(...adidMatches);
+  const pdfUrl = `https://www.durhamnc.gov/ArchiveCenter/ViewFile/Item/${latestAdid}`;
+  console.log('Durham PDF URL:', pdfUrl, '(ADID:', latestAdid + ')');
+
+  const pdfResp = await fetchUrl(pdfUrl);
+  if (pdfResp.status !== 200) throw new Error(`Durham PDF HTTP ${pdfResp.status}`);
+
+  // Get as-of date from PDF text layer
+  const pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js'));
+  pdfjsLib.GlobalWorkerOptions.workerSrc = false;
+  const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfResp.body) }).promise;
+  const pg1 = await pdf.getPage(1);
+  const tc  = await pg1.getTextContent();
+  const text = tc.items.map(i => i.str).join(' ');
+  const dateMatch = text.match(/through\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
+  let asof = null;
+  if (dateMatch) {
+    const months = {january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+    const mo = months[dateMatch[1].toLowerCase()];
+    if (mo) asof = `${dateMatch[3]}-${String(mo).padStart(2,'0')}-${String(parseInt(dateMatch[2])).padStart(2,'0')}`;
+  }
+  console.log('Durham asof:', asof);
+
+  // Render PDF page to PNG using pdfjs + node-canvas
+  const { createCanvas } = require('canvas');
+  const viewport = pg1.getViewport({ scale: 2.0 });
+  const canvas  = createCanvas(viewport.width, viewport.height);
+  const ctx     = canvas.getContext('2d');
+  await pg1.render({ canvasContext: ctx, viewport }).promise;
+  const pngBuf = canvas.toBuffer('image/png');
+  console.log('Durham: rendered PDF to PNG, size:', pngBuf.length, 'bytes');
+
+  const base64Image = pngBuf.toString('base64');
+
+  // Send to Claude vision API
+  const claudeData = await new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
+          { type: 'text', text: 'This is a Durham Police Department shooting data chart. Look at the "Non-Fatal" bar group on the right side. What are the exact numbers shown above the three bars for 2024, 2025, and 2026? Reply with ONLY: 2024=N 2025=N 2026=N' }
+        ]
+      }]
+    });
+    const req = require('https').request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch(e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  const responseText = claudeData.content?.[0]?.text || '';
+  console.log('Durham vision response:', responseText);
+
+  const m2025 = responseText.match(/2025=(\d+)/);
+  const m2026 = responseText.match(/2026=(\d+)/);
+  if (!m2026) throw new Error('Could not parse Durham chart values. Response: ' + responseText);
+
+  return {
+    ytd:   parseInt(m2026[1]),
+    prior: m2025 ? parseInt(m2025[1]) : null,
+    asof
+  };
+}
+
+
+// ─── Milwaukee (Tableau) ──────────────────────────────────────────────────────
+
+async function fetchMilwaukee() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  page.setDefaultTimeout(30000);
+
+  console.log('Milwaukee: loading Tableau dashboard...');
+  await page.goto(
+    'https://public.tableau.com/views/MilwaukeePoliceDepartment-PartICrimes/MPDPublicCrimeDashboard?:embed=y&:showVizHome=no',
+    { waitUntil: 'domcontentloaded', timeout: 60000 }
+  );
+
+  // Wait for dashboard to render
+  try {
+    await page.waitForFunction(
+      () => document.body.innerText.includes('Non-Fatal'),
+      { timeout: 30000 }
+    );
+  } catch(e) {
+    console.log('Milwaukee: Non-Fatal not found after 30s, proceeding anyway...');
+  }
+  await page.waitForTimeout(5000);
+
+  // Get as-of date
+  const fullText = await page.evaluate(() => document.body.innerText);
+  const dateMatch = fullText.match(/Data Current Through[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  let asof = null;
+  if (dateMatch) {
+    asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
+  }
+  console.log('Milwaukee asof:', asof);
+
+  // Screenshot the page and send to Claude vision API
+  const screenshotBuf = await page.screenshot({ fullPage: false });
+  await browser.close();
+  console.log('Milwaukee: screenshot taken, size:', screenshotBuf.length, 'bytes');
+
+  const base64Image = screenshotBuf.toString('base64');
+
+  const claudeData = await new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: base64Image } },
+          { type: 'text', text: 'This is a Milwaukee Police Department crime dashboard. Find the row labeled "Non-Fatal Shooting" in the table. It has columns for YTD 2024, YTD 2025, and YTD 2026. What are those three YTD numbers? Reply with ONLY: YTD2024=N YTD2025=N YTD2026=N' }
+        ]
+      }]
+    });
+    const req = require('https').request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch(e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  const responseText = claudeData.content?.[0]?.text || '';
+  console.log('Milwaukee vision response:', responseText);
+
+  const m2025 = responseText.match(/YTD2025=(\d+)/);
+  const m2026 = responseText.match(/YTD2026=(\d+)/);
+
+  if (!m2026) throw new Error('Could not parse Milwaukee YTD from vision API. Response: ' + responseText);
+
+  return {
+    ytd:   parseInt(m2026[1]),
+    prior: m2025 ? parseInt(m2025[1]) : null,
+    asof
+  };
+}
+
+
+// ─── Memphis (Power BI) ───────────────────────────────────────────────────────
+
+async function fetchMemphis() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  page.setDefaultTimeout(30000);
+
+  console.log('Memphis: loading Power BI dashboard...');
+  await page.goto(
+    'https://app.powerbigov.us/view?r=eyJrIjoiZTYyYmQ0Y2QtZTM0Ni00ZTFiLThkMjMtOTYxYWZiOWUyZDU4IiwidCI6IjQxNjQ3NTYxLTY1MzctNDQyMy05NmE5LTg1OWU4OWY4OTE5ZiJ9',
+    { waitUntil: 'domcontentloaded', timeout: 60000 }
+  );
+
+  // Wait for Power BI content to render
+  try {
+    await page.waitForFunction(
+      () => document.body.innerText.includes('Crime Overview'),
+      { timeout: 30000 }
+    );
+  } catch(e) {
+    console.log('Memphis: Crime Overview not found after 30s, proceeding anyway...');
+  }
+  await page.waitForTimeout(5000);
+
+  // Grab as-of date from page 1: "Data through 2/21/2026" bottom right
+  const page1Text = await page.evaluate(() => document.body.innerText);
+  console.log('Memphis page1 sample:', page1Text.substring(0, 400));
+  let asof = null;
+  const dateMatch = page1Text.match(/Data through\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  if (dateMatch) {
+    asof = dateMatch[3] + '-' + dateMatch[1].padStart(2,'0') + '-' + dateMatch[2].padStart(2,'0');
+    console.log('Memphis as-of:', asof);
+  }
+
+  // Click Crime Summary tab
+  console.log('Memphis: clicking Crime Summary tab...');
+  try {
+    await page.getByText('Crime Summary').first().click();
+  } catch(e) {
+    await page.locator('text=Crime Summary').first().click();
+  }
+  await page.waitForTimeout(4000);
+
+  // Click Non-Fatal Shooting button
+  console.log('Memphis: clicking Non-Fatal Shooting...');
+  await page.locator('text=Non-Fatal').first().click();
+  await page.waitForTimeout(6000); // extra wait for chart to render
+
+  // Read chart - shows "2026: 69" and "2025: 92 (-25%)"
+  const chartText = await page.evaluate(() => document.body.innerText);
+  console.log('Memphis chart sample:', chartText.substring(0, 600));
+
+  await browser.close();
+
+  const yr = new Date().getFullYear();
+
+  // Chart title shows "2026: 69" and "2025: 92 (-25%)" - parse directly from title
+  // Title is '2026: 692025: 92 (-25%)' - match both years in one pass
+  const bothMatch = chartText.match(new RegExp(yr + ':\\s*(\\d+)' + (yr-1) + ':\\s*(\\d+)'));
+  const ytdMatch   = bothMatch ? {1: bothMatch[1]} : null;
+  const priorMatch = bothMatch ? {1: bothMatch[2]} : null;
+
+  console.log('Memphis ytdMatch:', ytdMatch && ytdMatch[0], 'priorMatch:', priorMatch && priorMatch[0]);
+
+  if (!ytdMatch) throw new Error('Could not find ' + yr + ': N in chart text. Sample: ' + chartText.substring(0, 400));
+
+  return {
+    ytd:   parseInt(ytdMatch[1]),
+    prior: priorMatch ? parseInt(priorMatch[1]) : null,
+    asof
+  };
+}
+
+// ─── Hampton (JPEG image) ─────────────────────────────────────────────────────
+
+async function fetchHampton() {
+  // Hampton posts a JPEG table at a fixed URL - use Claude vision to extract numbers
+  const jpegUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
+  console.log('Hampton: fetching JPEG from', jpegUrl);
+
+  const resp = await fetchUrl(jpegUrl);
+  if (resp.status !== 200) throw new Error(`Hampton JPEG HTTP ${resp.status}`);
+
+  const base64Image = resp.body.toString('base64');
+  // Detect media type - likely JPEG but confirm
+  const mediaType = resp.body[0] === 0xFF && resp.body[1] === 0xD8 ? 'image/jpeg' : 'image/png';
+  console.log('Hampton: image size:', resp.body.length, 'bytes, type:', mediaType);
+
+  const claudeData = await new Promise((resolve, reject) => {
+    const yr = new Date().getFullYear();
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
+          { type: 'text', text: `This is a Hampton VA gunshot injury data table. Find the row "Persons Injured from Gunshots (not deceased)" - that is the non-fatal shooting count. What are the YTD ${yr-1} and YTD ${yr} values in that row? Also look for any date range shown (e.g. "Jan. 1 - Feb. 14, ${yr}"). Reply with ONLY: PRIOR=N YTD=N ASOF=YYYY-MM-DD (use the end date of the range for ASOF, or null if not found)` }
+        ]
+      }]
+    });
+    const req = require('https').request({
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': process.env.ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    }, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
+        catch(e) { reject(e); }
+      });
+    });
+    req.on('error', reject);
+    req.write(body);
+    req.end();
+  });
+
+  const responseText = claudeData.content?.[0]?.text || '';
+  console.log('Hampton vision response:', responseText);
+
+  const priorMatch = responseText.match(/PRIOR=(\d+)/);
+  const ytdMatch   = responseText.match(/YTD=(\d+)/);
+  const asofMatch  = responseText.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
+
+  if (!ytdMatch) throw new Error('Could not parse Hampton values. Response: ' + responseText);
+
+  return {
+    ytd:   parseInt(ytdMatch[1]),
+    prior: priorMatch ? parseInt(priorMatch[1]) : null,
+    asof:  asofMatch ? asofMatch[1] : null
+  };
+}
+
+
+// ─── Pittsburgh (Power BI Gov) ───────────────────────────────────────────────
+
+async function fetchPittsburgh() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  await page.setViewportSize({ width: 1536, height: 768 });
+  page.setDefaultTimeout(30000);
+
+  const url = 'https://app.powerbigov.us/view?r=eyJrIjoiMDYzNWMyNGItNWNjMS00ODMwLWIxZDgtMTNkNzhlZDE2OWFjIiwidCI6ImY1ZjQ3OTE3LWM5MDQtNDM2OC05MTIwLWQzMjdjZjE3NTU5MSJ9';
+  console.log('Pittsburgh: loading Power BI dashboard...');
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  // Power BI Gov renders via canvas/iframe - wait generously for initial load
+  await page.waitForTimeout(20000);
+
+  // Get as-of date from page 1 header "Last Updated: M/DD/YYYY"
+  const page1Text = await page.evaluate(() => document.body.innerText);
+  const dateMatch = page1Text.match(/Last Updated[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  let asof = null;
+  if (dateMatch) {
+    asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
+  }
+  console.log('Pittsburgh asof:', asof);
+  console.log('Pittsburgh page1 snippet:', page1Text.substring(0, 400));
+
+  // Navigate to "Year to Date Stats" page - try multiple selectors
+  console.log('Pittsburgh: navigating to Year to Date Stats page...');
+  let navigated = false;
+  for (const selector of [
+    '[aria-label="Year to Date Stats"]',
+    '[aria-label="Annual Stats"]',
+    'button.sectionItem:first-child',
+    '.pbi-glyph-chevronrightmedium',
+  ]) {
+    try {
+      await page.locator(selector).first().click({ force: true, timeout: 5000 });
+      await page.waitForTimeout(8000);
+      console.log('Pittsburgh: navigated via', selector);
+      navigated = true;
+      break;
+    } catch(e) { /* try next */ }
+  }
+  if (!navigated) console.log('Pittsburgh: could not navigate, will screenshot current page');
+
+  // Log what page we're on now
+  const page2Text = await page.evaluate(() => document.body.innerText);
+  console.log('Pittsburgh post-nav snippet:', page2Text.substring(0, 400));
+
+  // Note: Gun legend click was attempted but Power BI Gov does not update
+  // the accessibility tree when cross-filtering, so we read all-weapon totals.
+  // (Guns are ~93% of incidents so this is a close approximation of gun-only.)
+
+  // Parse values directly from page text
+  const pageText = await page.evaluate(() => document.body.innerText);
+  await browser.close();
+  await browser.close();
+
+  const yr = new Date().getFullYear();
+
+  // Extract homicides: find "Number of Homicides" section, grab yr and yr-1 values
+  let homYtd = null, homPrior = null, nfsYtd = null, nfsPrior = null;
+
+  // Pattern: after "Number of Homicides", lines are: "Select Row\nYEAR\nVALUE\n..."
+  const homSection = pageText.match(/Number of Homicides[\s\S]*?Number of Non-Fatal/);
+  if (homSection) {
+    const rows = homSection[0].matchAll(/(\d{4})\n(\d+)\n/g);
+    for (const r of rows) {
+      if (parseInt(r[1]) === yr)     homYtd   = parseInt(r[2]);
+      if (parseInt(r[1]) === yr - 1) homPrior = parseInt(r[2]);
+    }
+  }
+
+  // Pattern: after "Number of Non-Fatal Shootings"
+  const nfsSection = pageText.match(/Number of Non-Fatal Shootings[\s\S]*?(?:Last 28|YTD %|$)/);
+  if (nfsSection) {
+    const rows = nfsSection[0].matchAll(/(\d{4})\n(\d+)\n/g);
+    for (const r of rows) {
+      if (parseInt(r[1]) === yr)     nfsYtd   = parseInt(r[2]);
+      if (parseInt(r[1]) === yr - 1) nfsPrior = parseInt(r[2]);
+    }
+  }
+
+  // Fallback: scan for year+value pairs near the table headers
+  if (homYtd === null || nfsYtd === null) {
+    // Try alternate parsing: "Select Row\n2026\n4\n-33.33%"
+    const allRows = [...pageText.matchAll(/Select Row\s+(\d{4})\s+(\d+)\s+[-\d.]+%/g)];
+    console.log('Pittsburgh fallback rows:', allRows.map(r => `${r[1]}=${r[2]}`).join(', '));
+    // First set of year rows = homicides, second set = non-fatal
+    const yrRows = allRows.filter(r => parseInt(r[1]) === yr);
+    const priorRows = allRows.filter(r => parseInt(r[1]) === yr - 1);
+    if (yrRows.length >= 2) {
+      homYtd = parseInt(yrRows[0][2]);
+      nfsYtd = parseInt(yrRows[1][2]);
+    }
+    if (priorRows.length >= 2) {
+      homPrior = parseInt(priorRows[0][2]);
+      nfsPrior = parseInt(priorRows[1][2]);
+    }
+  }
+
+  console.log(`Pittsburgh parsed: hom${yr}=${homYtd} nfs${yr}=${nfsYtd} hom${yr-1}=${homPrior} nfs${yr-1}=${nfsPrior}`);
+
+  if (homYtd === null || nfsYtd === null) {
+    throw new Error('Could not parse Pittsburgh homicide/NFS values from page text');
+  }
+
+  return {
+    ytd:   homYtd + nfsYtd,
+    prior: (homPrior !== null && nfsPrior !== null) ? homPrior + nfsPrior : null,
+    asof
+  };
+}
+
+
+// ─── Buffalo (Tableau - NY GIVE Dashboard) ────────────────────────────────────
+
+async function fetchBuffalo() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  await page.setViewportSize({ width: 1536, height: 1024 });
+  page.setDefaultTimeout(30000);
+
+  const yr = new Date().getFullYear();
+
+  async function forceClick(locator, timeout) {
+    await locator.click({ force: true, timeout: timeout || 8000 });
+  }
+
+  // Step 1: Load dashboard
+  console.log('Buffalo: loading GIVE dashboard...');
+  await page.goto('https://mypublicdashboard.ny.gov/t/OJRP_PUBLIC/views/GIVEInitiative/GIVE-LandingPage', { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(10000);
+
+  // Step 2: Click GIVE-Shooting Activity tab
+  console.log('Buffalo: clicking Shooting Activity tab...');
+  try {
+    await forceClick(page.locator('text=GIVE-Shooting Activity').first());
+    await page.waitForTimeout(8000);
+    console.log('Buffalo: on Shooting Activity tab');
+  } catch(e) { console.log('Buffalo: tab click failed:', e.message); }
+
+  // Step 3: Open Jurisdiction dropdown (second (All) on page)
+  console.log('Buffalo: opening Jurisdiction dropdown...');
+  try {
+    const allEls = page.locator('text=(All)');
+    const count = await allEls.count();
+    console.log('Buffalo: (All) count:', count);
+    await forceClick(allEls.nth(count >= 2 ? 1 : 0));
+    await page.waitForTimeout(3000);
+    console.log('Buffalo: jurisdiction dropdown opened');
+  } catch(e) { console.log('Buffalo: jurisdiction open failed:', e.message); }
+
+  // Step 4: Deselect all inside dropdown
+  console.log('Buffalo: deselecting all...');
+  try {
+    const allEls = page.locator('text=(All)');
+    const count = await allEls.count();
+    console.log('Buffalo: (All) count after open:', count);
+    await forceClick(allEls.last());
+    await page.waitForTimeout(1000);
+    console.log('Buffalo: deselected all');
+  } catch(e) { console.log('Buffalo: deselect all failed:', e.message); }
+
+  // Step 5: Select Buffalo City PD
+  console.log('Buffalo: selecting Buffalo City PD...');
+  try {
+    await forceClick(page.locator('text=Buffalo City PD').first());
+    await page.waitForTimeout(1000);
+    console.log('Buffalo: selected Buffalo City PD');
+  } catch(e) { console.log('Buffalo: Buffalo City PD click failed:', e.message); }
+
+  // Step 6: Click Apply
+  console.log('Buffalo: clicking Apply...');
+  try {
+    await forceClick(page.locator('text=Apply').first());
+    await page.waitForTimeout(6000);
+    console.log('Buffalo: applied filter');
+  } catch(e) { console.log('Buffalo: Apply failed:', e.message); }
+
+  // Step 7: Click Monthly Data toggle
+  console.log('Buffalo: clicking Monthly Data...');
+  try {
+    await forceClick(page.locator('text=Monthly Data').first());
+    await page.waitForTimeout(8000);
+    console.log('Buffalo: switched to Monthly Data');
+  } catch(e) { console.log('Buffalo: Monthly Data click failed:', e.message); }
+
+  // Step 8: Click Download toolbar button
+  console.log('Buffalo: clicking Download toolbar button...');
+  try {
+    await forceClick(page.locator('[data-tb-test-id="viz-viewer-toolbar-button-download"]').first());
+    await page.waitForTimeout(2000);
+    console.log('Buffalo: download menu opened');
+  } catch(e) { console.log('Buffalo: download button failed:', e.message); }
+
+  // Step 9: Click Crosstab
+  console.log('Buffalo: clicking Crosstab...');
+  try {
+    await forceClick(page.locator('text=Crosstab').first());
+    await page.waitForTimeout(2000);
+    console.log('Buffalo: crosstab dialog opened');
+  } catch(e) { console.log('Buffalo: Crosstab click failed:', e.message); }
+
+  // Step 10: Select Monthly Total Overview sheet
+  console.log('Buffalo: selecting Monthly Total Overview...');
+  try {
+    await forceClick(page.locator('text=Monthly Total Overview').first(), 5000);
+    await page.waitForTimeout(1000);
+    console.log('Buffalo: selected Monthly Total Overview');
+  } catch(e) { console.log('Buffalo: sheet selection failed:', e.message); }
+
+  // Step 11: Select CSV
+  console.log('Buffalo: selecting CSV...');
+  try {
+    await forceClick(page.locator('text=CSV').first(), 5000);
+    await page.waitForTimeout(500);
+    console.log('Buffalo: CSV selected');
+  } catch(e) { console.log('Buffalo: CSV select failed:', e.message); }
+
+  // Step 12: Download and capture file
+  console.log('Buffalo: clicking Download button...');
+  let csvText = null;
+  try {
+    const [ download ] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30000 }),
+      forceClick(page.locator('button:has-text("Download")').last())
+    ]);
+    const stream = await download.createReadStream();
+    const chunks = [];
+    await new Promise((res, rej) => {
+      stream.on('data', c => chunks.push(c));
+      stream.on('end', res);
+      stream.on('error', rej);
+    });
+    // File is UTF-16 LE with BOM, tab-delimited, long format
+    const buf = Buffer.concat(chunks);
+    csvText = buf.toString('utf16le').replace(/^\uFEFF/, '');
+    console.log('Buffalo: CSV downloaded, bytes:', buf.length);
+    console.log('Buffalo: CSV preview:', csvText.substring(0, 200));
+  } catch(e) {
+    console.log('Buffalo: CSV download failed:', e.message);
+  }
+
+  await browser.close();
+
+  if (!csvText) throw new Error('Buffalo: could not download CSV');
+
+  // Format: tab-delimited, long format
+  // Columns: Month | Shooting Category | Count
+  // Each row is duplicated — take first occurrence only
+  const janCurr  = 'Jan-' + String(yr).slice(2);
+  const janPrior = 'Jan-' + String(yr - 1).slice(2);
+
+  let victimsYtd = null, victimsPrior = null;
+  let killedYtd  = null, killedPrior  = null;
+
+  const rows = csvText.split('\n').map(function(l) { return l.replace(/\r/g, '').trim(); }).filter(Boolean);
+  console.log('Buffalo: total rows:', rows.length, '| janCurr:', janCurr, '| janPrior:', janPrior);
+
+  for (var i = 1; i < rows.length; i++) {
+    var cols = rows[i].split('\t');
+    if (cols.length < 3) continue;
+    var month    = cols[0].trim();
+    var category = cols[1].trim().toLowerCase();
+    var count    = parseInt(cols[2].trim().replace(/,/g, ''));
+    if (isNaN(count)) continue;
+
+    var isVictims = category.indexOf('shooting victims') >= 0 || category.indexOf('persons hit') >= 0;
+    var isKilled  = category.indexOf('individuals killed') >= 0 || category.indexOf('gun violence') >= 0;
+    if (!isVictims && !isKilled) continue;
+
+    if (month === janCurr) {
+      if (isVictims && victimsYtd === null)  victimsYtd = count;
+      if (isKilled  && killedYtd  === null)  killedYtd  = count;
+    }
+    if (month === janPrior) {
+      if (isVictims && victimsPrior === null) victimsPrior = count;
+      if (isKilled  && killedPrior  === null) killedPrior  = count;
+    }
+  }
+
+  console.log('Buffalo parsed: victimsYtd=' + victimsYtd + ' killedYtd=' + killedYtd + ' victimsPrior=' + victimsPrior + ' killedPrior=' + killedPrior);
+
+  if (victimsYtd === null || killedYtd === null) {
+    var months = rows.slice(1).map(function(r) { return r.split('\t')[0]; });
+    var unique = months.filter(function(v, i, a) { return a.indexOf(v) === i; });
+    throw new Error('Buffalo: could not find ' + janCurr + ' values. Last months: ' + unique.slice(-6).join(', '));
+  }
+
+  return {
+    ytd:   victimsYtd + killedYtd,
+    prior: (victimsPrior !== null && killedPrior !== null) ? victimsPrior + killedPrior : null,
+    asof:  yr + '-01-31'
+  };
+}
+
+
+
+async function fetchMiamiDade() {
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  await page.setViewportSize({ width: 1536, height: 768 });
+  page.setDefaultTimeout(30000);
+
+  // Load the wrapper page and find the Power BI iframe src
+  const url = 'https://www.miamidade.gov/global/police/crime-stats.page';
+  console.log('MiamiDade: loading wrapper page...');
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(10000);
+
+  // Find iframe src containing powerbi
+  const iframeSrc = await page.evaluate(() => {
+    const frames = Array.from(document.querySelectorAll('iframe'));
+    const pbi = frames.find(f => f.src && f.src.includes('powerbi'));
+    return pbi ? pbi.src : null;
+  });
+  console.log('MiamiDade iframe src:', iframeSrc);
+
+  if (!iframeSrc) {
+    // Log page source snippet to help debug
+    const src = await page.content();
+    console.log('MiamiDade page source snippet:', src.substring(0, 2000));
+    await browser.close();
+    throw new Error('Could not find Power BI iframe on Miami-Dade page');
+  }
+
+  // Navigate directly to the Power BI embed
+  console.log('MiamiDade: loading Power BI embed directly...');
+  await page.goto(iframeSrc, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(20000);
+
+  const page1Text = await page.evaluate(() => document.body.innerText);
+  console.log('MiamiDade PBI page1 sample:', page1Text.substring(0, 600));
+
+  // Extract as-of date from "Last update date: MM/DD/YYYY"
+  const dateMatch = page1Text.match(/Last update dat[ae][:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  let asof = null;
+  if (dateMatch) {
+    asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
+  }
+  console.log('MiamiDade asof:', asof);
+
+  // Navigate to page 3 by clicking next twice
+  console.log('MiamiDade: navigating to page 3...');
+  for (let i = 0; i < 2; i++) {
+    try {
+      await page.locator('.pbi-glyph-chevronrightmedium').first().click({ force: true, timeout: 5000 });
+      await page.waitForTimeout(5000);
+      console.log(`MiamiDade: clicked next (${i+1}/2)`);
+    } catch(e) {
+      // Try aria-label next button
+      try {
+        await page.locator('[aria-label="Next page"]').first().click({ force: true, timeout: 3000 });
+        await page.waitForTimeout(5000);
+        console.log(`MiamiDade: clicked Next page button (${i+1}/2)`);
+      } catch(e2) {
+        console.log(`MiamiDade: nav click ${i+1} failed:`, e.message);
+      }
+    }
+  }
+
+  const page3Text = await page.evaluate(() => document.body.innerText);
+  console.log('MiamiDade page3 sample:', page3Text.substring(0, 1000));
+  await browser.close();
+
+  // Try to get asof from page3 if page1 didn't have it
+  if (!asof) {
+    const dateMatch3 = page3Text.match(/Last update dat[ae][:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+    if (dateMatch3) {
+      asof = `${dateMatch3[3]}-${dateMatch3[1].padStart(2,'0')}-${dateMatch3[2].padStart(2,'0')}`;
+      console.log('MiamiDade asof from page3:', asof);
+    }
+  }
+
+  const yr = new Date().getFullYear();
+  let ytd = null, prior = null;
+
+  // Strategy 1: find SHOOTINGS followed by number+percent pairs
+  const shootMatch = page3Text.match(/SHOOTINGS[\s\S]{0,300}/i);
+  if (shootMatch) {
+    const nums = [...shootMatch[0].matchAll(/(\d+)\s+[-\d.]+%/g)];
+    console.log('MiamiDade shootings nums:', nums.map(m => m[1]).join(', '));
+    if (nums.length >= 1) ytd   = parseInt(nums[0][1]);
+    if (nums.length >= 2) prior = parseInt(nums[1][1]);
+  }
+
+  // Strategy 2: line-by-line scan
+  if (ytd === null) {
+    const lines = page3Text.split('\n').map(l => l.trim()).filter(Boolean);
+    for (let i = 0; i < lines.length; i++) {
+      if (/^SHOOTINGS$/i.test(lines[i])) {
+        const vals = [];
+        for (let j = i + 1; j < Math.min(i + 10, lines.length); j++) {
+          if (/^\d+$/.test(lines[j])) vals.push(parseInt(lines[j]));
+          if (vals.length === 2) break;
+        }
+        console.log('MiamiDade line-scan shootings:', vals);
+        if (vals.length >= 1) ytd   = vals[0];
+        if (vals.length >= 2) prior = vals[1];
+        break;
+      }
+    }
+  }
+
+  console.log(`MiamiDade parsed: ytd=${ytd} prior=${prior}`);
+  if (ytd === null) throw new Error('Could not parse MiamiDade shootings from page text');
+
+  return { ytd, prior, asof };
+}
+
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
+
+// ─── Omaha ─────────────────────────────────────────────────────────────────────
+// Fetches the OPD Non-Fatal Shootings and Homicides PDF and sums YTD V columns
+
+async function fetchOmaha() {
+  // Use Playwright to get the rendered page (JS-rendered links)
+  // The OPD site is fully JS-rendered so we can't scrape it.
+  // Instead, fetch the PDF directly using the known URL pattern.
+  // URL format: /images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_MMDDYYYY.pdf
+  // We try recent dates going backwards from today to find the current file.
+  
+  // police.cityofomaha.org returns 403 from GitHub Actions IPs.
+  // Instead, commit the latest PDF to data/omaha-shootings.pdf and read it locally.
+  const pdfPath = require('path').join(__dirname, '..', 'data', 'omaha-shootings.pdf');
+  if (!require('fs').existsSync(pdfPath)) {
+    throw new Error('Omaha PDF not found at data/omaha-shootings.pdf — please commit the latest PDF from https://police.cityofomaha.org/opd-crime-statistics');
+  }
+  const pdfBuf = require('fs').readFileSync(pdfPath);
+  console.log('Omaha PDF loaded from local file, size:', pdfBuf.length);
+
+  // Parse all pages to find the YTD row for current year
+  let pdfjsLib;
+  try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
+  catch(e) { pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
+
+  const loadTask = pdfjsLib.getDocument({ data: new Uint8Array(pdfBuf) });
+  const pdfDoc = await loadTask.promise;
+
+  let allText = '';
+  for (let p = 1; p <= pdfDoc.numPages; p++) {
+    const page = await pdfDoc.getPage(p);
+    const tc = await page.getTextContent();
+    allText += tc.items.map(i => i.str).join(' ') + '\n';
+  }
+
+  // The PDF has rows like: 2026  NFS_I  NFS_V  HOM_I  HOM_V  (per month, then YTD at end)
+  // Strategy: find the "Last update" date for asof, then find the current year YTD values
+  const yr = new Date().getFullYear();
+
+  // Extract asof from "Last update: Non-Fatal Shootings M/D/YYYY"
+  const asofMatch = allText.match(/Last update[:\s]+Non-Fatal Shootings\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i)
+    || allText.match(/Last update[:\s]+\S+\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
+  let asof = null;
+  if (asofMatch) {
+    const [, m, d, y] = asofMatch;
+    asof = `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  console.log('Omaha asof:', asof);
+
+  // Extract tokens as numbers for parsing
+  // The table structure per year row: YEAR NFS_I NFS_V HOM_I HOM_V (repeated per month) ... YTD_NFS_I YTD_NFS_V YTD_HOM_I YTD_HOM_V
+  // We need the YTD column which is the last set of 4 numbers in the current year row
+  // Find the year row: look for "2026" followed by sequences of numbers
+  const tokens = allText.replace(/\s+/g, ' ').split(' ');
+  
+  // Find index of the current year
+  const yrIdx = tokens.findIndex(t => t === String(yr));
+  const priorYrIdx = tokens.findIndex(t => t === String(yr - 1));
+
+  function extractYtdFromRow(startIdx, useFirst = false) {
+    if (startIdx < 0) return null;
+    const rowTokens = [];
+    for (let i = startIdx + 1; i < tokens.length && i < startIdx + 300; i++) {
+      const t = tokens[i];
+      if (/^\d{4}$/.test(t) && parseInt(t) >= 2020) break;
+      rowTokens.push(t);
+    }
+    const nums = rowTokens.filter(t => /^\d+$/.test(t)).map(Number);
+    const nonZeroNums = nums.filter(n => n > 0);
+    if (nonZeroNums.length >= 4) {
+      const n = nonZeroNums.length;
+      // For current year: last 4 non-zero = YTD (NFS_I, NFS_V, HOM_I, HOM_V)
+      // For prior year: first 4 non-zero = Jan data (same-period comparison)
+      if (useFirst) {
+        return { nfsV: nonZeroNums[1], homV: nonZeroNums[3] };
+      }
+      return { nfsV: nonZeroNums[n - 3], homV: nonZeroNums[n - 1] };
+    }
+    return null;
+  }
+
+  const ytdData   = extractYtdFromRow(yrIdx, false);
+  const priorData = extractYtdFromRow(priorYrIdx, true);
+
+  console.log(`Omaha ytd data:`, ytdData, `prior data:`, priorData);
+
+  if (!ytdData) throw new Error('Could not parse Omaha YTD row for ' + yr);
+
+  return {
+    ytd:   ytdData.nfsV + ytdData.homV,
+    prior: priorData ? priorData.nfsV + priorData.homV : null,
+    asof
+  };
+}
+
+
+async function main() {
+  const fetchedAt = new Date().toISOString();
+  const outDir = path.join(__dirname, '..', 'data');
+  const outPath = path.join(outDir, 'manual-auto.json');
+
+  let existing = {};
+  try { existing = JSON.parse(fs.readFileSync(outPath, 'utf8')); } catch (e) { /* first run */ }
+
+  const results = {};
+
+  // Helper: wrap a fetch with a timeout and catch errors without throwing
+  function safe(name, fn, timeoutMs) {
+    timeoutMs = timeoutMs || 120000;
+    const timer = new Promise((_, reject) => setTimeout(() => reject(new Error(name + ' timed out after ' + (timeoutMs/1000) + 's')), timeoutMs));
+    return Promise.race([fn(), timer])
+      .then(function(r) {
+        console.log('\n--- ' + name + ' OK ---');
+        console.log(name + ':', { ...r, fetchedAt, ok: true });
+        return { key: name.toLowerCase().replace(/[^a-z]/g,''), value: { ...r, fetchedAt, ok: true } };
+      })
+      .catch(function(e) {
+        console.error('\n--- ' + name + ' FAILED:', e.message, '---');
+        return { key: name.toLowerCase().replace(/[^a-z]/g,''), value: { ok: false, error: e.message, fetchedAt } };
+      });
+  }
+
+  // Omaha is manual — preserve existing
+  results.omaha = existing.omaha || { ok: false, error: 'No manual data yet' };
+
+  // Run all fetches in parallel
+  console.log('Starting all fetches in parallel...');
+  const fetches = await Promise.all([
+    safe('Detroit',    fetchDetroit,    60000),
+    safe('Durham',     fetchDurham,     60000),
+    safe('Milwaukee',  fetchMilwaukee,  60000),
+    safe('Memphis',    fetchMemphis,    120000),
+    safe('Hampton',    fetchHampton,    60000),
+    safe('MiamiDade',  fetchMiamiDade,  120000),
+    safe('Pittsburgh', fetchPittsburgh, 120000),
+    safe('Portland',   fetchPortland,   120000),
+    safe('Buffalo',    fetchBuffalo,    120000),
+    safe('Nashville',  fetchNashville,  120000),
+  ]);
+
+  for (const { key, value } of fetches) {
+    results[key] = value;
+  }
+
+  // Write output
+  if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
+  fs.writeFileSync(outPath, JSON.stringify(results, null, 2));
+  console.log('\nWrote', outPath);
+  console.log(JSON.stringify(results, null, 2));
+}
+
+main().catch(e => { console.error(e); process.exit(1); });
+
+
+// ─── Portland (Tableau - PPB Shooting Incident Statistics) ───────────────────
+// The YTD chart numbers are rendered as SVG — not accessible via innerText.
+// Strategy: load the viz, clear the date filter so YTD shows all months,
+// deselect "No Injury" from the shooting type filter, then take a screenshot
+// of the YTD Comparison bar chart and send to vision API.
+
+async function fetchPortland() {
+  // Uses the Gun Violence Trends Report dashboard (YTD & Rolling Year Statistics sheet)
+  // Table has plain DOM text: Homicides by Firearm Incidents + Non-Fatal Injury Shooting Incidents
+  // = Shooting Incidents (matches Portland's definition, excludes No-Injury)
+  const { chromium } = require('playwright');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  await page.setViewportSize({ width: 1536, height: 900 });
+  page.setDefaultTimeout(30000);
+
+  const yr = new Date().getFullYear();
+
+  const embedUrl = 'https://public.tableau.com/views/GunViolenceTrendsReport/YeartoDateRollingYearStatistics?:showVizHome=no&:embed=true';
+  console.log('Portland: loading Gun Violence Trends Report YTD sheet...');
+  await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(12000);
+
+  // Get asof from date range text like "January 1, 2026 - January 31, 2026"
+  const bodyText = await page.evaluate(function() { return document.body.innerText; });
+  console.log('Portland: body sample:', bodyText.substring(0, 400));
+
+  // Parse asof from "Current Year to Date: January 1, YYYY - Month D, YYYY"
+  let asof = null;
+  const asofMatch = bodyText.match(/Current Year to Date:[^|]+\|[^\n]*?([A-Z][a-z]+ \d+, \d{4})/);
+  if (asofMatch) {
+    const d = new Date(asofMatch[1]);
+    if (!isNaN(d)) asof = d.toISOString().slice(0,10);
+  }
+  // Fallback: grab "Updated: M/D/YYYY"
+  if (!asof) {
+    const upd = bodyText.match(/Updated:\s+(\d+)\/(\d+)\/(\d+)/);
+    if (upd) asof = upd[3] + '-' + upd[1].padStart(2,'0') + '-' + upd[2].padStart(2,'0');
+  }
+  console.log('Portland: asof:', asof);
+
+  // Parse the YTD table - find rows for Homicides by Firearm Incidents and Non-Fatal Injury Shooting Incidents
+  // Table text will contain these labels followed by numbers
+  // "Current YTD Count" is the first number after each label
+  const tableData = await page.evaluate(function(yr) {
+    // Get all text nodes and their values from the viz
+    var text = document.body.innerText;
+    return text;
+  }, yr);
+
+  console.log('Portland: full text length:', tableData.length);
+
+  // Parse the table rows
+  // Expected format in DOM text (from screenshot):
+  // "Homicides by Firearm Incidents	1	2	..."
+  // "Non-Fatal Injury Shooting Incidents	8	11	..."
+  // or whitespace-separated
+
+  // Split into lines and find the rows we need
+  const lines = tableData.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+  console.log('Portland: line count:', lines.length);
+
+  // Log lines around key terms
+  const keyTerms = ['Homicide', 'Non-Fatal', 'Firearm', 'Total Shooting', 'YTD Count'];
+  lines.forEach(function(l, i) {
+    if (keyTerms.some(function(k) { return l.includes(k); })) {
+      console.log('Portland line', i + ':', l.substring(0, 120));
+    }
+  });
+
+  // Find Homicides by Firearm Incidents current YTD
+  // Find Non-Fatal Injury Shooting Incidents current YTD
+  let homFirearmYtd = null, homFirearmPrior = null;
+  let nfsiYtd = null, nfsiPrior = null;
+
+  for (var i = 0; i < lines.length; i++) {
+    var l = lines[i];
+    if (l.includes('Homicides by Firearm Incidents') || l === 'Homicides by Firearm Incidents') {
+      // Numbers may be on the same line (tab-separated) or the next few lines
+      var nums = (l + ' ' + (lines[i+1]||'') + ' ' + (lines[i+2]||'')).match(/\b(\d+)\b/g);
+      if (nums && nums.length >= 2) {
+        homFirearmYtd = parseInt(nums[0]);
+        homFirearmPrior = parseInt(nums[1]);
+        console.log('Portland: HomFirearm YTD=' + homFirearmYtd + ' Prior=' + homFirearmPrior);
+      }
+    }
+    if (l.includes('Non-Fatal Injury Shooting Incidents') || l === 'Non-Fatal Injury Shooting Incidents') {
+      var nums2 = (l + ' ' + (lines[i+1]||'') + ' ' + (lines[i+2]||'')).match(/\b(\d+)\b/g);
+      if (nums2 && nums2.length >= 2) {
+        nfsiYtd = parseInt(nums2[0]);
+        nfsiPrior = parseInt(nums2[1]);
+        console.log('Portland: NFSI YTD=' + nfsiYtd + ' Prior=' + nfsiPrior);
+      }
+    }
+  }
+
+  await browser.close();
+
+  if (homFirearmYtd === null || nfsiYtd === null) {
+    throw new Error('Portland: could not parse table values. homFirearm=' + homFirearmYtd + ' nfsi=' + nfsiYtd);
+  }
+
+  const ytd   = homFirearmYtd + nfsiYtd;
+  const prior = homFirearmPrior + nfsiPrior;
+  console.log('Portland final: homFirearm=' + homFirearmYtd + '+' + nfsiYtd + '=' + ytd + ' prior=' + homFirearmPrior + '+' + nfsiPrior + '=' + prior + ' asof=' + asof);
+
+  if (ytd === 0 && prior === 0) throw new Error('Portland: parsed all zeros');
+  return { ytd, prior, asof };
+}
+
+
+// ─── Nashville (Tableau - Metro Nashville Gunshot Injuries map) ───────────────
+// Dashboard: https://www.nashville.gov/departments/police/crime-statistics
+// Tableau viz with a map download. Set "Offense Report Date" to "Last 3 years",
+// download crosstab (Map sheet) as CSV. Each row = one victim.
+// Filter by year client-side to get YTD vs prior YTD counts.
+
+async function fetchNashville() {
+  // Default filter is "This year". We download twice:
+  //   1) Default ("This year") → current YTD victims
+  //   2) Change to "Last year" → prior YTD victims (filtered to same MM/DD cutoff)
+  const { chromium } = require('playwright');
+  const fs = require('fs');
+  const browser = await chromium.launch({ headless: true });
+  const page    = await browser.newPage();
+  await page.setViewportSize({ width: 1536, height: 900 });
+  page.setDefaultTimeout(30000);
+
+  const embedUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:showVizHome=no&:embed=true&:toolbar=yes&:device=desktop';
+
+  // Helper: find a Tableau tabComboBox by label/text and click it, return coords
+  async function findAndClickCombo(labelHint) {
+    const info = await page.evaluate(function(hint) {
+      var combos = Array.from(document.querySelectorAll('.tabComboBox'));
+      var match = combos.find(function(el) {
+        return (el.getAttribute('aria-label') || '').toLowerCase().includes(hint) ||
+               el.textContent.trim().toLowerCase().includes(hint);
+      });
+      if (!match) {
+        // Log all combos to help debug
+        return { found: false, all: combos.map(function(el) {
+          return { label: el.getAttribute('aria-label'), text: el.textContent.trim().substring(0,60) };
+        })};
+      }
+      var r = match.getBoundingClientRect();
+      return { found: true, x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2), text: match.textContent.trim().substring(0,60) };
+    }, labelHint);
+    if (info.found) {
+      await page.mouse.click(info.x, info.y);
+    }
+    return info;
+  }
+
+  // Helper: find an option in an open dropdown by text and click it
+  async function clickOption(optText) {
+    const info = await page.evaluate(function(text) {
+      var allEls = Array.from(document.querySelectorAll('*'));
+      // Look for leaf elements matching the text exactly
+      var opt = allEls.find(function(el) {
+        return (el.innerText || '').trim() === text && el.children.length === 0;
+      });
+      if (!opt) {
+        var items = allEls
+          .filter(function(el) { return el.tagName === 'LI' || el.getAttribute('role') === 'option'; })
+          .map(function(el) { return (el.innerText||el.textContent||'').trim().substring(0,50); })
+          .filter(Boolean);
+        return { found: false, items: items.slice(0, 15) };
+      }
+      var r = opt.getBoundingClientRect();
+      return { found: true, x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
+    }, optText);
+    if (info.found) {
+      await page.mouse.click(info.x, info.y);
+    }
+    return info;
+  }
+
+  // Helper: run the full download flow (opens menu, clicks Crosstab, selects CSV, downloads)
+  async function downloadCSV(label) {
+    // Click toolbar Download button
+    const dlBtn = await page.evaluate(function() {
+      var candidates = Array.from(document.querySelectorAll('*'));
+      var btn = candidates.find(function(el) {
+        var l = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+        var r = el.getBoundingClientRect();
+        return (l.includes('download') || l.includes('export')) && r.width > 0 && r.height > 0;
+      });
+      if (!btn) return null;
+      var r = btn.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2), label: btn.getAttribute('aria-label') };
+    });
+    if (!dlBtn) throw new Error('Download toolbar button not found');
+    console.log('Nashville: download btn for ' + label + ':', JSON.stringify(dlBtn));
+    await page.mouse.click(dlBtn.x, dlBtn.y);
+    await page.waitForTimeout(1500);
+
+    // Click Crosstab
+    const ctBtn = await page.evaluate(function() {
+      var els = Array.from(document.querySelectorAll('*'));
+      var ct = els.find(function(el) { return (el.innerText || '').trim() === 'Crosstab'; });
+      if (!ct) return null;
+      var r = ct.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
+    });
+    if (!ctBtn) throw new Error('Crosstab option not found');
+    await page.mouse.click(ctBtn.x, ctBtn.y);
+    await page.waitForTimeout(1500);
+
+    // Select CSV
+    const csvBtn = await page.evaluate(function() {
+      var els = Array.from(document.querySelectorAll('*'));
+      var csv = els.find(function(el) { return (el.innerText || '').trim() === 'CSV'; });
+      if (!csv) return null;
+      var r = csv.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
+    });
+    if (csvBtn) {
+      await page.mouse.click(csvBtn.x, csvBtn.y);
+      await page.waitForTimeout(500);
+    }
+
+    // Click final Download button
+    const finalBtn = await page.evaluate(function() {
+      var btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+      var dl = btns.find(function(b) {
+        var t = (b.innerText || b.textContent || '').trim();
+        return t === 'Download' || t === 'Export';
+      });
+      if (!dl) return null;
+      var r = dl.getBoundingClientRect();
+      return { x: Math.round(r.x + r.width/2), y: Math.round(r.y + r.height/2) };
+    });
+    if (!finalBtn) throw new Error('Final Download button not found');
+
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: 30000 }),
+      page.mouse.click(finalBtn.x, finalBtn.y)
+    ]);
+    const dlPath = await download.path();
+    const rawBuf = fs.readFileSync(dlPath);
+    const csvText = (rawBuf[0] === 0xFF && rawBuf[1] === 0xFE)
+      ? rawBuf.toString('utf16le')
+      : rawBuf.toString('utf8');
+    console.log('Nashville: ' + label + ' CSV downloaded, bytes:', rawBuf.length, 'rows:', csvText.split('\n').length);
+    return csvText;
+  }
+
+  // Helper: count victim rows in a CSV for a given year, up to MM/DD cutoff
+  function countVictims(csvText, targetYear, mmddCutoff) {
+    var lines = csvText.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+    var header = lines[0].replace(/^\uFEFF/, '');
+    var cols = header.split('\t');
+    var rptdtIdx = cols.indexOf('I Rptdt');
+    if (rptdtIdx < 0) throw new Error('I Rptdt column not found, cols: ' + cols.join(','));
+    var count = 0, maxDate = null, asof = null;
+    for (var i = 1; i < lines.length; i++) {
+      var parts = lines[i].split('\t');
+      if (parts.length <= rptdtIdx) continue;
+      var rptdt = (parts[rptdtIdx] || '').trim();
+      if (!rptdt) continue;
+      var datePart = rptdt.split(' ')[0];
+      var dp = datePart.split('/');
+      if (dp.length < 3) continue;
+      var rowYr = parseInt(dp[2]);
+      var rowMm = dp[0].padStart(2,'0');
+      var rowDd = dp[1].padStart(2,'0');
+      if (rowYr !== targetYear) continue;
+      if (mmddCutoff && (rowMm + '/' + rowDd) > mmddCutoff) continue;
+      count++;
+      var d = new Date(rowYr, parseInt(dp[0])-1, parseInt(dp[1]));
+      if (!maxDate || d > maxDate) { maxDate = d; asof = rowYr + '-' + rowMm + '-' + rowDd; }
+    }
+    return { count: count, asof: asof };
+  }
+
+  // ── Step 1: Load page, confirm it renders ──────────────────────────────────
+  console.log('Nashville: loading dashboard...');
+  await page.goto(embedUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+  await page.waitForTimeout(10000);
+
+  const bodyText = await page.evaluate(function() { return document.body.innerText; });
+  console.log('Nashville: page sample:', bodyText.substring(0, 300));
+
+  const now = new Date();
+  const curYr = now.getFullYear();
+  const priorYr = curYr - 1;
+  const mmdd = (now.getMonth() + 1).toString().padStart(2,'0') + '/' + now.getDate().toString().padStart(2,'0');
+
+  // ── Step 2: Download current year CSV (default "This year" filter) ─────────
+  let csvCurrent = null;
+  try {
+    csvCurrent = await downloadCSV('current year');
+  } catch(e) {
+    console.log('Nashville: current year download failed:', e.message.split('\n')[0]);
+  }
+
+  // ── Step 3: Change filter to "Last year", download prior year CSV ──────────
+  let csvPrior = null;
+  try {
+    // Find and click the date filter combo
+    console.log('Nashville: switching filter to Last year...');
+    const comboResult = await findAndClickCombo('offense report date');
+    console.log('Nashville: date combo result:', JSON.stringify(comboResult));
+    await page.waitForTimeout(2000);
+
+    // Click "Last year" option
+    const optResult = await clickOption('Last year');
+    console.log('Nashville: Last year option:', JSON.stringify(optResult));
+    if (!optResult.found) {
+      // Log what options are available
+      console.log('Nashville: available options:', JSON.stringify(optResult.items));
+    }
+    await page.waitForTimeout(4000);
+
+    csvPrior = await downloadCSV('prior year');
+  } catch(e) {
+    console.log('Nashville: prior year download failed:', e.message.split('\n')[0]);
+  }
+
+  await browser.close();
+
+  if (!csvCurrent) throw new Error('Nashville: no current year CSV');
+  if (!csvPrior)   throw new Error('Nashville: no prior year CSV');
+
+  // ── Step 4: Parse both CSVs ────────────────────────────────────────────────
+  const currResult  = countVictims(csvCurrent, curYr,   null);   // all current year = YTD by definition
+  const priorResult = countVictims(csvPrior,   priorYr, mmdd);   // prior year up to same MM/DD
+
+  const ytd   = currResult.count;
+  const prior = priorResult.count;
+  const asof  = currResult.asof;
+
+  console.log('Nashville parsed: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof + ' (cutoff=' + mmdd + ')');
+  if (ytd === 0 && prior === 0) throw new Error('Nashville: parsed all zeros');
+  return { ytd, prior, asof };
+}
