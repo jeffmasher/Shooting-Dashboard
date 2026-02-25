@@ -1737,13 +1737,13 @@ function exportJPEG() {
   ctx.fillRect(0, totalY, W, ROW_H);
 
   var ty = totalY + 23;
-  ctx.fillStyle = '#0D1B2A';
+  ctx.fillStyle = '#000000';
   ctx.font = 'bold 13px Georgia, serif';
   ctx.textAlign = 'left';
   ctx.fillText('TOTAL (' + rows.length + ' agencies)', colCity, ty);
   ctx.textAlign = 'right';
   ctx.fillText(totalYtd.toLocaleString(), colYTD, ty);
-  ctx.fillStyle = '#FFFFFF';
+  ctx.fillStyle = '#000000';
   ctx.font = '13px Georgia, serif';
   ctx.fillText(totalPrior.toLocaleString(), colPrior, ty);
   if (totalChg != null) {
