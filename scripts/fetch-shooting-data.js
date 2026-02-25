@@ -1195,28 +1195,39 @@ async function fetchNashville() {
   await page.setViewportSize({ width: 1536, height: 900 });
   page.setDefaultTimeout(30000);
 
+  // Load the nashville.gov page — Tableau embed is in an iframe
   console.log('Nashville: loading nashville.gov page...');
   await page.goto('https://www.nashville.gov/departments/police/data-dashboard/gunshot-injuries-map',
     { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(12000);
 
-  // Log interactive elements for diagnosis
-  const pageInfo = await page.evaluate(function() {
+  // Find the Tableau iframe and get a frame handle
+  const frames = page.frames();
+  console.log('Nashville: frames:', frames.length, frames.map(f => f.url().substring(0,80)));
+  const vizFrame = frames.find(f => f.url().includes('policepublicdata.nashville.gov') && f.url().includes('GunshotInjury'));
+  if (!vizFrame) { await browser.close(); throw new Error('Nashville: Tableau iframe not found. Frames: ' + frames.map(f=>f.url().substring(0,80)).join(', ')); }
+  console.log('Nashville: found Tableau iframe:', vizFrame.url().substring(0,100));
+
+  // Helper: evaluate in the iframe context
+  const fEval = (fn, ...args) => vizFrame.evaluate(fn, ...args);
+
+  // Log toolbar buttons in the iframe
+  const toolbarBtns = await fEval(function() {
     return Array.from(document.querySelectorAll('*')).filter(function(el) {
       var r = el.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && (el.innerText||el.getAttribute('aria-label')||'').trim();
-    }).slice(0, 50).map(function(el) {
+      var label = (el.getAttribute('aria-label')||el.getAttribute('data-tb-test-id')||el.innerText||'').trim();
+      return r.width > 0 && r.height > 0 && label;
+    }).slice(0, 40).map(function(el) {
       var r = el.getBoundingClientRect();
-      return { tag: el.tagName,
-               text: (el.innerText||'').trim().substring(0,40),
-               label: (el.getAttribute('aria-label')||'').substring(0,40),
-               testId: (el.getAttribute('data-tb-test-id')||''),
+      return { tag: el.tagName, label: (el.getAttribute('aria-label')||'').substring(0,40),
+               testId: (el.getAttribute('data-tb-test-id')||''), text: (el.innerText||'').trim().substring(0,30),
                x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
     });
   });
-  console.log('Nashville: page elements:', JSON.stringify(pageInfo.slice(0,25)));
+  console.log('Nashville: iframe elements:', JSON.stringify(toolbarBtns.slice(0,20)));
 
-  const dlBtn = await page.evaluate(function() {
+  // Find download button inside iframe
+  const dlInfo = await fEval(function() {
     var el = Array.from(document.querySelectorAll('*')).find(function(e) {
       var label = (e.getAttribute('aria-label')||e.getAttribute('title')||e.innerText||'').toLowerCase();
       var r = e.getBoundingClientRect();
@@ -1224,20 +1235,13 @@ async function fetchNashville() {
     });
     if (!el) return null;
     var r = el.getBoundingClientRect();
-    return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2),
-             label: el.getAttribute('aria-label')||el.innerText||'' };
+    return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2), label: el.getAttribute('aria-label')||el.innerText||'' };
   });
-  console.log('Nashville: download button:', JSON.stringify(dlBtn));
+  console.log('Nashville: iframe download button:', JSON.stringify(dlInfo));
+  if (!dlInfo) { await browser.close(); throw new Error('Nashville: download button not found in iframe'); }
 
-  if (!dlBtn) {
-    const frames = page.frames();
-    console.log('Nashville: frames:', frames.length, frames.map(f => f.url()).slice(0,5));
-    await browser.close();
-    throw new Error('Nashville: download button not found — see page elements log above');
-  }
-
-  // Set filter to "Last 3 years"
-  const filterBtn = await page.evaluate(function() {
+  // Set filter to "Last 3 years" inside iframe
+  const filterBtn = await fEval(function() {
     var el = Array.from(document.querySelectorAll('*')).find(function(e) {
       var t = (e.innerText||'').trim();
       var r = e.getBoundingClientRect();
@@ -1248,10 +1252,11 @@ async function fetchNashville() {
     return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
   });
   if (filterBtn) {
-    console.log('Nashville: clicking date filter...');
+    console.log('Nashville: clicking date filter in iframe');
+    await vizFrame.click('body'); // focus iframe
     await page.mouse.click(filterBtn.x, filterBtn.y);
     await page.waitForTimeout(2000);
-    const lastThreeOpt = await page.evaluate(function() {
+    const lastThreeOpt = await fEval(function() {
       var el = Array.from(document.querySelectorAll('*')).find(function(e) {
         var t = (e.innerText||'').trim();
         var r = e.getBoundingClientRect();
@@ -1266,81 +1271,70 @@ async function fetchNashville() {
       await page.mouse.click(lastThreeOpt.x, lastThreeOpt.y);
       await page.waitForTimeout(5000);
     } else {
-      console.log('Nashville: "Last 3 years" not found in dropdown');
+      console.log('Nashville: "Last 3 years" not found');
     }
   } else {
-    console.log('Nashville: date filter not found, proceeding as-is');
+    console.log('Nashville: date filter not found in iframe');
   }
 
-  // Click Download toolbar button
+  // Click Download button in iframe
   const downloadPromise = page.waitForEvent('download', { timeout: 25000 }).catch(() => null);
-  await page.mouse.click(dlBtn.x, dlBtn.y);
+  await vizFrame.click('body');
+  await page.mouse.click(dlInfo.x, dlInfo.y);
   await page.waitForTimeout(1500);
 
-  // Click Crosstab
-  const crosstabBtn = await page.evaluate(function() {
-    var el = Array.from(document.querySelectorAll('*')).find(function(e) {
-      var t = (e.innerText||'').trim().toLowerCase();
-      var r = e.getBoundingClientRect();
-      return t === 'crosstab' && r.width > 0 && r.height > 0;
-    });
-    if (!el) return null;
-    var r = el.getBoundingClientRect();
-    return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
-  });
-  console.log('Nashville: crosstab:', JSON.stringify(crosstabBtn));
-  if (!crosstabBtn) { await browser.close(); throw new Error('Nashville: Crosstab not found in download menu'); }
-  await page.mouse.click(crosstabBtn.x, crosstabBtn.y);
-  await page.waitForTimeout(1000);
-
-  // Select Map sheet in dialog
-  const mapSheet = await page.evaluate(function() {
-    var el = Array.from(document.querySelectorAll('*')).find(function(e) {
-      var t = (e.innerText||'').trim();
-      var r = e.getBoundingClientRect();
-      return t === 'Map' && r.width > 0 && r.height > 0 &&
-             (e.tagName === 'LI' || e.tagName === 'LABEL' || e.tagName === 'INPUT' ||
-              (typeof e.className==='string' && (e.className.includes('sheet')||e.className.includes('tab')||e.className.includes('item'))));
-    }) || Array.from(document.querySelectorAll('*')).find(function(e) {
-      var t = (e.innerText||'').trim();
-      var r = e.getBoundingClientRect();
-      return t === 'Map' && r.width > 0 && r.height > 0;
-    });
-    if (!el) return null;
-    var r = el.getBoundingClientRect();
-    return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2), tag: el.tagName };
-  });
-  console.log('Nashville: Map sheet:', JSON.stringify(mapSheet));
-  if (mapSheet) {
-    await page.mouse.click(mapSheet.x, mapSheet.y);
-    await page.waitForTimeout(500);
-  } else {
-    const dialogItems = await page.evaluate(function() {
-      return Array.from(document.querySelectorAll('*')).filter(function(e) {
-        var r = e.getBoundingClientRect();
-        return r.width > 0 && r.height > 0 && (e.innerText||'').trim().length > 0 && (e.innerText||'').trim().length < 60;
-      }).slice(0, 30).map(function(e) {
-        return { tag: e.tagName, text: (e.innerText||'').trim(), cls: (e.className||'').substring(0,50) };
-      });
-    });
-    console.log('Nashville: dialog items (Map not found):', JSON.stringify(dialogItems));
+  // Click Crosstab in download menu (may appear in main page or iframe)
+  async function findAndClick(label) {
+    for (const ctx of [fEval, fn => page.evaluate(fn)]) {
+      const pos = await ctx(function(lbl) {
+        var el = Array.from(document.querySelectorAll('*')).find(function(e) {
+          var t = (e.innerText||'').trim().toLowerCase();
+          var r = e.getBoundingClientRect();
+          return t === lbl && r.width > 0 && r.height > 0;
+        });
+        if (!el) return null;
+        var r = el.getBoundingClientRect();
+        return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
+      }, label);
+      if (pos) { await page.mouse.click(pos.x, pos.y); return true; }
+    }
+    return false;
   }
 
-  // Select CSV
-  const csvOpt = await page.evaluate(function() {
-    var el = Array.from(document.querySelectorAll('*')).find(function(e) {
-      var t = (e.innerText||'').trim().toUpperCase();
+  const foundCrosstab = await findAndClick('crosstab');
+  console.log('Nashville: crosstab clicked:', foundCrosstab);
+  if (!foundCrosstab) { await browser.close(); throw new Error('Nashville: Crosstab option not found'); }
+  await page.waitForTimeout(1000);
+
+  // Log dialog contents then select Map sheet
+  const dialogItems = await fEval(function() {
+    return Array.from(document.querySelectorAll('*')).filter(function(e) {
       var r = e.getBoundingClientRect();
-      return t === 'CSV' && r.width > 0 && r.height > 0;
+      return r.width > 0 && r.height > 0 && (e.innerText||'').trim().length > 0 && (e.innerText||'').trim().length < 60;
+    }).slice(0, 40).map(function(e) {
+      var r = e.getBoundingClientRect();
+      return { tag: e.tagName, text: (e.innerText||'').trim(), cls: (e.className||'').substring(0,40),
+               x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
     });
-    if (!el) return null;
-    var r = el.getBoundingClientRect();
-    return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
   });
-  if (csvOpt) { await page.mouse.click(csvOpt.x, csvOpt.y); await page.waitForTimeout(500); }
+  console.log('Nashville: dialog items:', JSON.stringify(dialogItems));
+
+  // Click Map sheet
+  const mapItem = dialogItems.find(function(i) { return i.text === 'Map'; });
+  if (mapItem) {
+    console.log('Nashville: clicking Map sheet');
+    await page.mouse.click(mapItem.x, mapItem.y);
+    await page.waitForTimeout(500);
+  } else {
+    console.log('Nashville: Map sheet not found in dialog');
+  }
+
+  // Select CSV format
+  await findAndClick('csv');
+  await page.waitForTimeout(500);
 
   // Click Download in dialog
-  const dlDialog = await page.evaluate(function() {
+  const dlDialog = await fEval(function() {
     var el = Array.from(document.querySelectorAll('button, a')).find(function(e) {
       var t = (e.innerText||'').trim();
       var r = e.getBoundingClientRect();
@@ -1350,7 +1344,7 @@ async function fetchNashville() {
     var r = el.getBoundingClientRect();
     return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
   });
-  console.log('Nashville: dialog Download:', JSON.stringify(dlDialog));
+  console.log('Nashville: dialog Download button:', JSON.stringify(dlDialog));
   if (dlDialog) { await page.mouse.click(dlDialog.x, dlDialog.y); }
 
   const dl = await downloadPromise;
