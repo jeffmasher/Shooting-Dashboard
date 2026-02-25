@@ -1343,35 +1343,43 @@ async function fetchHartford() {
     return dates;
   }
 
-  function buildUrl(d) {
+  // The CMS version in the URL path (/v/1/, /v/2/, /v/3/, etc.) changes over time
+  function buildUrl(d, version) {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     const yy = String(yyyy).slice(-2);
-    return `https://www.hartfordct.gov/files/assets/public/v/1/police/police-documents/compstat/${yyyy}/${mm}/we-${mm}-${dd}-${yy}.pdf`;
+    return 'https://www.hartfordct.gov/files/assets/public/v/' + version + '/police/police-documents/compstat/' + yyyy + '/' + mm + '/we-' + mm + '-' + dd + '-' + yy + '.pdf';
   }
 
   function fmtDate(d) {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
 
-  // Try downloading recent PDFs
+  // Try downloading recent PDFs with multiple CMS version paths
   const saturdays = getWeekEndingSaturdays();
+  const versions = [3, 2, 1, 4, 5]; // /v/N/ in URL - try most likely versions first
   let pdfBuffer = null;
   let asof = null;
 
   for (const d of saturdays) {
-    const url = buildUrl(d);
-    console.log('Hartford: trying', url);
-    try {
-      const resp = await fetchUrl(url, 20000);
-      if (resp.status === 200 && resp.body.length > 10000 && resp.body[0] === 0x25) {
-        pdfBuffer = resp.body;
-        asof = fmtDate(d);
-        console.log('Hartford: downloaded PDF for', asof, '(' + (resp.body.length / 1024).toFixed(0) + ' KB)');
-        break;
+    for (const v of versions) {
+      const url = buildUrl(d, v);
+      console.log('Hartford: trying', url);
+      try {
+        const resp = await fetchUrl(url, 15000);
+        console.log('Hartford:   status=' + resp.status + ' size=' + resp.body.length + ' byte0=0x' + (resp.body.length > 0 ? resp.body[0].toString(16) : '??'));
+        if (resp.status === 200 && resp.body.length > 10000 && resp.body[0] === 0x25) {
+          pdfBuffer = resp.body;
+          asof = fmtDate(d);
+          console.log('Hartford: downloaded PDF for', asof, '(' + (resp.body.length / 1024).toFixed(0) + ' KB) via /v/' + v + '/');
+          break;
+        }
+      } catch(e) {
+        console.log('Hartford:   error:', e.message);
       }
-    } catch(e) { /* try next */ }
+    }
+    if (pdfBuffer) break;
   }
 
   if (!pdfBuffer) throw new Error('Hartford: could not download any recent CompStat PDF');
