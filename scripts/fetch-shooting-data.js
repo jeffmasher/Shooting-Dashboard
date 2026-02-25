@@ -1013,7 +1013,7 @@ async function main() {
     safe('Pittsburgh', fetchPittsburgh, 120000),
     safe('Portland',   fetchPortland,   120000),
     safe('Buffalo',    fetchBuffalo,    120000),
-    safe('Nashville',  fetchNashville,  120000),
+    safe('Nashville',  fetchNashville,  180000),
   ]);
 
   for (const { key, value } of fetches) {
@@ -1243,7 +1243,6 @@ async function fetchNashville() {
     }
     console.log('Nashville: Download toolbar btn:', JSON.stringify(dlBtn));
 
-    const dlPromise = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
     await page.mouse.click(dlBtn.x, dlBtn.y);
     await page.waitForTimeout(1500);
 
@@ -1304,6 +1303,8 @@ async function fetchNashville() {
       return { x: Math.round(r.x+r.width/2), y: Math.round(r.y+r.height/2) };
     });
     console.log('Nashville: dialog Download btn:', JSON.stringify(dlDialogBtn));
+    // Set up download listener RIGHT before clicking — avoids 20s timeout drifting during dialog interactions
+    const dlPromise = page.waitForEvent('download', { timeout: 20000 }).catch(() => null);
     if (dlDialogBtn) { await page.mouse.click(dlDialogBtn.x, dlDialogBtn.y); }
 
     const dl = await dlPromise;
