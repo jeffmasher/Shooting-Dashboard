@@ -1280,39 +1280,57 @@ async function fetchNashville() {
 
   const baseUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries';
 
-  // For each month, load the viz with that month's date range and read the title count
+  // For each month: load the viz with that month's date range, screenshot it,
+  // and use vision API to read the gunshot victim count from the page title.
+  // The title always shows "Gunshot Injuries: M/D/YYYY - M/D/YYYY" and the map
+  // shows Fatal/Non-Fatal counts — the only numbers visible on the page.
   async function getMonthCount(year, month) {
     const pad = n => String(n).padStart(2, '0');
     const daysInMonth = new Date(year, month, 0).getDate();
     const dateParam = pad(month) + '%2F01%2F' + year + '-' + pad(month) + '%2F' + daysInMonth + '%2F' + year;
     const url = baseUrl + '?:embed=y&:showVizHome=no&Offense+Report+Date=' + dateParam;
+    const label = year + '-' + pad(month);
 
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     await page.waitForTimeout(4000);
 
-    // The title shows "Gunshot Injuries: M/D/YYYY - M/D/YYYY" and Fatal/Non-Fatal counts
-    // Read page text to find the counts
-    const bodyText = await page.evaluate(() => document.body.innerText);
+    const imgBuf = await page.screenshot({ fullPage: false });
 
-    // Look for "Fatal\nN\nNon-Fatal\nN" or similar patterns
-    const fatalMatch = bodyText.match(/Fatal[^\d]*(\d+)[^\d]*Non-Fatal[^\d]*(\d+)/);
-    if (fatalMatch) {
-      const total = parseInt(fatalMatch[1]) + parseInt(fatalMatch[2]);
-      console.log('Nashville: ' + year + '-' + pad(month) + ' fatal=' + fatalMatch[1] + ' nonfatal=' + fatalMatch[2] + ' total=' + total);
+    // Ask vision API to read Fatal and Non-Fatal counts from the screenshot
+    const imgB64 = imgBuf.toString('base64');
+    const body = JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 64,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imgB64 } },
+          { type: 'text', text: 'This is a Nashville gunshot injuries map dashboard. Find the Fatal and Non-Fatal gunshot victim counts displayed on the page. Reply ONLY: FATAL=N NONFATAL=N' }
+        ]
+      }]
+    });
+
+    const resp = await new Promise((resolve, reject) => {
+      const req = require('https').request({
+        hostname: 'api.anthropic.com', path: '/v1/messages', method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': process.env.ANTHROPIC_API_KEY,
+                   'anthropic-version': '2023-06-01', 'Content-Length': Buffer.byteLength(body) }
+      }, (res) => {
+        const chunks = []; res.on('data', c => chunks.push(c));
+        res.on('end', () => resolve(JSON.parse(Buffer.concat(chunks).toString())));
+      });
+      req.on('error', reject); req.write(body); req.end();
+    });
+
+    const text = (resp.content?.[0]?.text || '').trim();
+    const fatalM = text.match(/FATAL=(\d+)/);
+    const nonfatalM = text.match(/NONFATAL=(\d+)/);
+    if (fatalM && nonfatalM) {
+      const total = parseInt(fatalM[1]) + parseInt(nonfatalM[1]);
+      console.log('Nashville: ' + label + ' fatal=' + fatalM[1] + ' nonfatal=' + nonfatalM[1] + ' total=' + total);
       return total;
     }
-
-    // Fallback: hit the CSV endpoint with the same date filter using page.request (shares session/cookies)
-    const csvPath = '/t/Police/views/GunshotInjury/GunshotInjuries.csv?:embed=y&:showVizHome=no&Offense+Report+Date=' + dateParam;
-    const csvResp = await page.request.get('https://policepublicdata.nashville.gov' + csvPath);
-    const csv = await csvResp.text();
-    const allMatch = csv.match(/^All,.*?,(\d+)/m);
-    if (allMatch) {
-      console.log('Nashville: ' + year + '-' + pad(month) + ' = ' + allMatch[1] + ' (from CSV)');
-      return parseInt(allMatch[1]);
-    }
-
-    console.log('Nashville: ' + year + '-' + pad(month) + ' = null (could not parse). Body snippet: ' + bodyText.substring(0, 200));
+    console.log('Nashville: ' + label + ' vision response: ' + text + ' — could not parse');
     return null;
   }
 
