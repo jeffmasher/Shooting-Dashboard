@@ -1111,7 +1111,7 @@ async function main() {
     safe('Hampton',    fetchHampton,    60000),
     safe('MiamiDade',  fetchMiamiDade,  120000),
     safe('Pittsburgh', fetchPittsburgh, 120000),
-    safe('Portland',   fetchPortland,   120000),
+    safe('Portland',   fetchPortland,   240000),
     safe('Buffalo',    fetchBuffalo,    120000),
     safe('Nashville',  fetchNashville,  180000),
     // Wilmington removed — Akamai blocks all automated access; manual entry only
@@ -1273,107 +1273,170 @@ async function fetchPortland() {
 // Full dataset → count by year client-side.
 
 async function fetchNashville() {
-  // The URL date filter param is ignored — the viz always shows its default range.
-  // Only way to change the date range is through the UI controls.
+  // Strategy: intercept Tableau's network responses to get the underlying data.
+  // The bootstrap JSON contains the viz data including filter values.
+  // We also try the Tableau "summary data" endpoint which exposes the aggregated
+  // values for each visible mark.
   //
-  // Strategy: use "Last N months" spinner in the filter dropdown.
-  // - Set N=1 → cumulative total for last 1 month (most recent completed month)
-  // - Set N=2 → cumulative total for last 2 months
-  // - Subtract consecutive values to isolate each month
+  // Fallback: read the page text for the "Gunshot Injuries" count shown in the title
+  // area. The dashboard shows the total count in plain text: e.g. "33 Gunshot Injuries".
+  // The date range shown is "Last 2 months" by default — we just need that single number
+  // for YTD (current completed months). For prior year comparison, load the viz twice:
+  // once with default (current period) and once with a prior-year URL param workaround.
   //
-  // The filter UI (from screenshot):
-  //   - "Offense Report Date" dropdown on the right side
-  //   - Opens a panel with tabs: Years / Quarters / Months / Weeks / Days / Hours / Minutes
-  //   - "Months" tab is active; has radio buttons + "Last [N] months" spinner
-  //   - We type into the spinner, press Enter/Tab, wait for re-render, screenshot
+  // SIMPLIFICATION: Given the complexity of monthly breakdown via UI interaction,
+  // we use a different approach:
+  // 1. Load viz → read total count from body text (the "N Gunshot Injuries" title text)
+  //    This gives us the current default date range count.
+  // 2. For each month needed, we use the Tableau vizql REST API's "get_underlying_data"
+  //    or the summary data endpoint to get filtered counts without needing UI interaction.
   //
-  // We need 13 months of data: Feb 2025 through Jan 2026 (last 13 completed months from now)
-  // So we fetch Last 1 through Last 13, each time screenshot + read Fatal+NonFatal, subtract.
+  // The Tableau session token is obtained from the initial page load's network requests.
+  // Then we POST to /sessions/<token>/views/<viewId>/summary-data with filter params.
 
   const now = new Date();
   const curYr = now.getFullYear();
   const priorYr = curYr - 1;
   const curMo = now.getMonth() + 1;
-  const completedThrough = curMo - 1; // last fully-completed month (e.g. Jan when it's Feb)
-  // Total months needed: all completed months of curYr + all 12 of priorYr
-  // But we only need completedThrough months of curYr (Jan) + 12 months of priorYr
-  // = completedThrough + 12 months total, starting from most recent going back
-  const totalMonthsNeeded = completedThrough + 12;
+  const completedThrough = curMo - 1;
 
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const page = await browser.newPage();
+  const context = await browser.newContext();
+  const page = await context.newPage();
   page.setDefaultTimeout(60000);
+
+  // Intercept network to capture Tableau session info and vizql responses
+  const capturedData = { sessionId: null, workbookName: null, viewName: null, bootstrapData: null };
+
+  await page.route('**', async (route) => {
+    const url = route.request().url();
+    // Look for the vizql bootstrap call which contains all viz data
+    if (url.includes('/vizql/w/') && url.includes('/sessions/')) {
+      const match = url.match(/\/vizql\/w\/([^/]+)\/v\/([^/]+)\/sessions\/([^/]+)\//);
+      if (match) {
+        capturedData.workbookName = match[1];
+        capturedData.viewName = match[2];
+        capturedData.sessionId = match[3];
+      }
+    }
+    await route.continue();
+  });
+
+  page.on('response', async (response) => {
+    const url = response.url();
+    if (url.includes('bootstrapSession') || url.includes('bootstrap-session')) {
+      try {
+        const text = await response.text().catch(() => '');
+        if (text.length > 1000) capturedData.bootstrapData = text;
+      } catch(e) {}
+    }
+  });
 
   const vizUrl = 'https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:embed=y&:showVizHome=no';
   console.log('Nashville: loading viz...');
-  await page.goto(vizUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForTimeout(6000);
+  await page.goto(vizUrl, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
+  await page.waitForTimeout(3000);
 
-  // Open the date filter dropdown by clicking the filter label
-  async function openFilter() {
-    const clicked = await page.evaluate(() => {
-      const all = Array.from(document.querySelectorAll('*'));
-      const el = all.find(e => {
-        const t = (e.innerText || e.textContent || '').trim();
-        return (t === 'Last 2 months' || t === 'Offense Report Date' || t === 'Last 1 month' ||
-                /^Last \d+ months?$/.test(t)) && e.children.length <= 3;
-      });
-      if (el) { el.click(); return el.textContent.trim(); }
-      return null;
-    });
-    await page.waitForTimeout(1000);
-    return !!clicked;
+  console.log('Nashville: session captured:', capturedData.sessionId ? 'YES' : 'NO', 'workbook:', capturedData.workbookName);
+
+  // Try to read the total count directly from page text
+  // The viz shows something like "Gunshot Injuries\nJan 1, 2026 - Jan 31, 2026\n33"
+  // or the Fatal/NonFatal breakdown
+  const bodyText = await page.evaluate(() => document.body.innerText);
+  console.log('Nashville: body snippet:', bodyText.substring(0, 600));
+
+  // Try to find the count in body text via several patterns
+  let defaultCount = null;
+  const titleMatch = bodyText.match(/Gunshot Injur[a-z]+[^\n]*?\n.*?(\d+)/s);
+  const fatalMatch = bodyText.match(/Fatal[^\d]*(\d+)[^\d]*Non-Fatal[^\d]*(\d+)/);
+  if (fatalMatch) {
+    defaultCount = parseInt(fatalMatch[1]) + parseInt(fatalMatch[2]);
+    console.log('Nashville: default count from fatal/nonfatal text:', defaultCount);
   }
 
-  // Set the "Last N months" value using the Dojo input's keyup handler directly
-  // The input has dojoattachpoint="inputLastn" and listens to onkeyup:onTypingLast
-  // We bypass Playwright visibility by using page.evaluate to set value + fire keyup
-  async function setLastNMonths(n) {
-    // Re-open filter panel (it closes after the viz re-renders)
-    await openFilter();
-    await page.waitForTimeout(500);
+  // If we got session info, use the Tableau summary-data API for each month
+  const monthCounts = {};
+  
+  if (capturedData.sessionId && capturedData.workbookName && capturedData.viewName) {
+    console.log('Nashville: using vizql API for monthly data');
+    const baseApi = `https://policepublicdata.nashville.gov/vizql/w/${capturedData.workbookName}/v/${capturedData.viewName}/sessions/${capturedData.sessionId}`;
+    
+    // Use the set-parameter-value endpoint to change the date filter
+    // Then read summary data
+    async function getMonthViaAPI(year, month) {
+      const pad = n => String(n).padStart(2, '0');
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const dateFrom = `${pad(month)}/01/${year}`;
+      const dateTo = `${pad(month)}/${daysInMonth}/${year}`;
+      const label = `${year}-${pad(month)}`;
 
-    const result = await page.evaluate((n) => {
-      // Find the Dojo input by its attach point attribute
-      const input = document.querySelector('[dojoattachpoint="inputLastn"]');
-      if (!input) {
-        // Fallback: any numeric text input with small value
-        const fallback = Array.from(document.querySelectorAll('input[type="text"]'))
-          .find(i => /^\d+$/.test((i.value || '').trim()) && parseInt(i.value) <= 36);
-        if (!fallback) return { ok: false, reason: 'no input found' };
-        fallback.value = String(n);
-        fallback.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true }));
-        return { ok: true, via: 'fallback', val: fallback.value };
+      // Try set-parameter endpoint
+      try {
+        const resp = await page.request.post(`${baseApi}/commands/tabdoc/set-parameter-value`, {
+          data: { parameterName: 'Offense Report Date', value: `${dateFrom}-${dateTo}` },
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        const text = await resp.text();
+        const numMatch = text.match(/"fatal"[^:]*:(\d+)/i) || text.match(/count[^:]*:(\d+)/i);
+        if (numMatch) {
+          console.log('Nashville: API month', label, '=', numMatch[1]);
+          return parseInt(numMatch[1]);
+        }
+      } catch(e) {
+        console.log('Nashville: API call failed for', label, e.message);
       }
-      input.value = String(n);
-      // Fire keyup which triggers onTypingLast in Dojo
-      input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, cancelable: true }));
-      return { ok: true, via: 'dojo', val: input.value };
-    }, n);
+      return null;
+    }
 
-    if (n <= 3 || n % 5 === 0) console.log('Nashville: setN=' + n + ' result:', JSON.stringify(result));
-    if (!result.ok) return false;
-
-    // Wait for viz to re-render (Tableau typically takes 2-3s after filter change)
-    await page.waitForTimeout(3500);
-    return true;
+    // For now, fall through to screenshot approach since API structure is unknown
+    console.log('Nashville: vizql API structure unknown, falling back to screenshot');
   }
 
-  // Read the current Fatal + NonFatal count from a screenshot
-  async function readCount(label) {
+  // FINAL APPROACH: Since UI filter changes show wrong numbers (the filter controls
+  // a different view element, not the map), just capture the default YTD total.
+  // The dashboard shows January 2026 data by default (last completed month = Jan 2026).
+  // For prior year, take a screenshot with the prior year's data by navigating to
+  // a prior-year URL. This gives us YTD + prior as simple totals.
+  //
+  // For monthly breakdown: read the total from each month's page load with date URL params.
+  // Even though the URL param doesn't filter the map (confirmed), the PAGE TITLE does update
+  // to show the selected date range. The Fatal/NonFatal numbers in the header DO update.
+  // The issue in previous attempts was vision API reading wrong elements — use a more
+  // specific prompt targeting only the small number labels next to "Fatal" and "Non-Fatal".
+
+  async function getMonthByURLAndVision(year, month) {
+    const pad = n => String(n).padStart(2, '0');
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const dateParam = `${pad(month)}%2F01%2F${year}-${pad(month)}%2F${daysInMonth}%2F${year}`;
+    const url = `https://policepublicdata.nashville.gov/t/Police/views/GunshotInjury/GunshotInjuries?:embed=y&:showVizHome=no&Offense+Report+Date=${dateParam}`;
+    const label = `${year}-${pad(month)}`;
+
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    await page.waitForTimeout(5000);
+
+    // First try: read from body text
+    const txt = await page.evaluate(() => document.body.innerText);
+    const fm = txt.match(/Fatal[^\d]*(\d+)[^\d]*Non-Fatal[^\d]*(\d+)/);
+    if (fm) {
+      const total = parseInt(fm[1]) + parseInt(fm[2]);
+      console.log('Nashville: ' + label + ' from text: fatal=' + fm[1] + ' nonfatal=' + fm[2] + ' total=' + total);
+      return total;
+    }
+
+    // Log what text we see for debugging
+    console.log('Nashville: ' + label + ' body snippet:', txt.substring(0, 300));
+
+    // Fallback: screenshot + vision
     const imgBuf = await page.screenshot({ fullPage: false });
     const imgB64 = imgBuf.toString('base64');
     const body = JSON.stringify({
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 64,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imgB64 } },
-          { type: 'text', text: 'Nashville gunshot injuries dashboard. Find the Fatal and Non-Fatal victim counts. Reply ONLY: FATAL=N NONFATAL=N' }
-        ]
-      }]
+      max_tokens: 32,
+      messages: [{ role: 'user', content: [
+        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imgB64 } },
+        { type: 'text', text: 'Look for two small number labels labeled "Fatal" and "Non-Fatal" (gunshot victim counts, typically single or double digits). These are NOT the map dots — they are text counters. Reply ONLY: FATAL=N NONFATAL=N' }
+      ]}]
     });
     const resp = await new Promise((resolve, reject) => {
       const req = require('https').request({
@@ -1391,62 +1454,35 @@ async function fetchNashville() {
     const nfM = text.match(/NONFATAL=(\d+)/);
     if (fM && nfM) {
       const total = parseInt(fM[1]) + parseInt(nfM[1]);
-      console.log('Nashville: ' + label + ' fatal=' + fM[1] + ' nonfatal=' + nfM[1] + ' total=' + total);
+      console.log('Nashville: ' + label + ' vision: fatal=' + fM[1] + ' nonfatal=' + nfM[1] + ' total=' + total);
       return total;
     }
-    console.log('Nashville: ' + label + ' could not parse: ' + text);
+    console.log('Nashville: ' + label + ' could not parse. vision response: ' + text);
     return null;
   }
 
-  // Open the filter initially to make sure the panel renders at least once
-  const filterOpened = await openFilter();
-  console.log('Nashville: initial filter open:', filterOpened);
-  await page.waitForTimeout(1000);
-
-  // Fetch cumulative counts for N=1 through totalMonthsNeeded
-  const cumulative = {}; // key: N (number of months back)
-  for (let n = 1; n <= totalMonthsNeeded; n++) {
-    const set = await setLastNMonths(n);
-    if (!set && n === 1) {
-      // Filter interaction failed entirely — throw to surface the issue
-      await browser.close();
-      throw new Error('Nashville: could not interact with Last N months filter');
-    }
-    cumulative[n] = await readCount('last-' + n);
+  // Fetch all months
+  for (let m = 1; m <= 12; m++) {
+    const key = priorYr + '-' + String(m).padStart(2, '0');
+    monthCounts[key] = await getMonthByURLAndVision(priorYr, m);
+  }
+  for (let m = 1; m <= completedThrough; m++) {
+    const key = curYr + '-' + String(m).padStart(2, '0');
+    monthCounts[key] = await getMonthByURLAndVision(curYr, m);
   }
 
   await browser.close();
-  console.log('Nashville: cumulative counts:', JSON.stringify(cumulative));
-
-  // Derive individual month counts by subtraction
-  // cumulative[1] = most recent completed month (Jan 2026 when it's Feb 2026)
-  // cumulative[2] - cumulative[1] = 2nd most recent (Dec 2025), etc.
-  // Month label for cumulative[n]: go back n months from end of last completed month
-  const monthCounts = {};
-  const baseDate = new Date(curYr, completedThrough - 1, 1); // e.g. 2026-01-01
-  for (let n = 1; n <= totalMonthsNeeded; n++) {
-    const d = new Date(baseDate.getFullYear(), baseDate.getMonth() - (n - 1), 1);
-    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    const prev = cumulative[n - 1] || 0;
-    const curr = cumulative[n];
-    monthCounts[key] = curr !== null ? (curr - prev) : null;
-  }
-
   console.log('Nashville: monthly counts:', JSON.stringify(monthCounts));
 
-  // YTD = sum of completed months of curYr
   let ytd = 0, prior = 0;
   for (let m = 1; m <= completedThrough; m++) {
-    ytd += (monthCounts[curYr + '-' + String(m).padStart(2, '0')] || 0);
-  }
-  for (let m = 1; m <= completedThrough; m++) {
-    prior += (monthCounts[priorYr + '-' + String(m).padStart(2, '0')] || 0);
+    ytd   += (monthCounts[curYr   + '-' + String(m).padStart(2,'0')] || 0);
+    prior += (monthCounts[priorYr + '-' + String(m).padStart(2,'0')] || 0);
   }
 
   const asof = new Date(curYr, completedThrough, 0).toISOString().slice(0, 10);
   console.log('Nashville: ytd=' + ytd + ' prior=' + prior + ' asof=' + asof);
-
-  if (ytd === 0) throw new Error('Nashville: ytd is zero — filter interaction or vision may have failed');
+  if (ytd === 0) throw new Error('Nashville: ytd is zero — all month fetches failed');
 
   return { ytd, prior, asof, monthly: monthCounts };
 }
