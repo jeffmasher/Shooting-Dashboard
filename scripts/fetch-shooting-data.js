@@ -81,20 +81,32 @@ async function extractPdfTokens(buffer, pageNum = 1) {
 // ─── Detroit ──────────────────────────────────────────────────────────────────
 
 async function fetchDetroit() {
-  // Find most recent Thursday
-  const d = new Date();
-  const day = d.getDay();
-  const daysBack = day >= 4 ? day - 4 : day + 3;
-  d.setDate(d.getDate() - daysBack);
-  const yyyy = d.getFullYear();
-  const mm   = String(d.getMonth()+1).padStart(2,'0');
-  const dd   = String(d.getDate()).padStart(2,'0');
-  const yy   = String(yyyy).slice(2);
-  const pdfUrl = `https://detroitmi.gov/sites/detroitmi.localhost/files/events/${yyyy}-${mm}/${yy}${mm}${dd}%20DPD%20Stats.pdf`;
-
-  console.log('Detroit PDF URL:', pdfUrl);
-  const resp = await fetchUrl(pdfUrl);
-  if (resp.status !== 200) throw new Error(`Detroit PDF HTTP ${resp.status}`);
+  // Try recent dates going backwards to find the latest PDF
+  // Two known filename patterns: "YYMMDD DPD Stats.pdf" and "YYMMDD DPD Weekly Stats.pdf"
+  const today = new Date();
+  let resp = null;
+  let pdfUrl = null;
+  const patterns = ['DPD%20Stats', 'DPD%20Weekly%20Stats'];
+  
+  for (let back = 0; back <= 10; back++) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - back);
+    const yyyy = d.getFullYear();
+    const mm   = String(d.getMonth()+1).padStart(2,'0');
+    const dd   = String(d.getDate()).padStart(2,'0');
+    const yy   = String(yyyy).slice(2);
+    let found = false;
+    for (const pat of patterns) {
+      pdfUrl = `https://detroitmi.gov/sites/detroitmi.localhost/files/events/${yyyy}-${mm}/${yy}${mm}${dd}%20${pat}.pdf`;
+      console.log('Detroit: trying', pdfUrl);
+      resp = await fetchUrl(pdfUrl);
+      if (resp.status === 200) { found = true; break; }
+      console.log('Detroit:   status=' + resp.status);
+    }
+    if (found) break;
+  }
+  
+  if (!resp || resp.status !== 200) throw new Error(`Detroit PDF not found (tried 11 dates x 2 patterns)`);
 
   const tokens = await extractPdfTokens(resp.body);
   const text = tokens.join(' ');
@@ -1052,7 +1064,7 @@ async function main() {
   // Run all fetches in parallel
   console.log('Starting all fetches in parallel...');
   const fetches = await Promise.all([
-    safe('Detroit',    fetchDetroit,    60000),
+    safe('Detroit',    fetchDetroit,    120000),
     safe('Durham',     fetchDurham,     60000),
     safe('Milwaukee',  fetchMilwaukee,  60000),
     safe('Memphis',    fetchMemphis,    120000),
@@ -1069,7 +1081,16 @@ async function main() {
   ]);
 
   for (const { key, value } of fetches) {
-    results[key] = value;
+    if (value.ok) {
+      results[key] = value;
+    } else if (existing[key] && existing[key].ok) {
+      // Keep previous good data when this run fails
+      console.log(key + ': keeping previous good data (ytd=' + existing[key].ytd + ' asof=' + existing[key].asof + ')');
+      results[key] = existing[key];
+      results[key].stale = true;
+    } else {
+      results[key] = value;
+    }
   }
 
   // Write output
