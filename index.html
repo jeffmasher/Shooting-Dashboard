@@ -1552,7 +1552,11 @@ function render() {
     var manualBtn = city.manual ? ' <button class="manual-btn" onclick="openManual(\'' + city.id + '\')" title="Edit">✎ Edit</button>' : '';
     var srcUrl = city.dataUrl || city._pdfUrl || city._csvUrl || city._url || (city._datasets ? city._datasets[Object.keys(city._datasets)[0]] : null);
     var sourceLink = srcUrl ? '<a class="manual-btn" href="' + srcUrl + '" target="_blank" title="Open source">Source</a>' : '—';
-    var zeroWarn = (s.ytd === 0 && (s.prior === 0 || s.prior == null)) ? '<div class="city-note" style="color:var(--yellow)">⚠ 0 for both years — possible data source error</div>' : '';
+    var bothZero = (s.ytd === 0 && (s.prior === 0 || s.prior == null));
+    var bothBlank = (!city.manual && s.ytd == null && s.prior == null && s.status === 'ok');
+    var zeroWarn = bothZero ? '<div class="city-note" style="color:var(--yellow)">⚠ 0 for both years — possible data source error</div>'
+                 : bothBlank ? '<div class="city-note" style="color:var(--yellow)">⚠ No data returned — possible data source error</div>'
+                 : '';
     var dotClass = zeroWarn ? 'dot-loading' : 'dot-ok';
     return divider + '<tr' + (city.manual ? ' class="manual-row"' : '') + '>' +
       '<td><div class="city-name"><span class="dot ' + dotClass + '"></span>' + city.name + manualBtn + '</div>' + zeroWarn + (city.noteHtml ? '<div class="city-note">' + city.noteHtml + '</div>' : '') + '</td>' +
