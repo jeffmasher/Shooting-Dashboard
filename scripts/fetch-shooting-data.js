@@ -481,7 +481,7 @@ async function fetchHampton() {
         role: 'user',
         content: [
           { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
-          { type: 'text', text: `This is a Hampton VA gunshot injury data table. Find the row "Persons Injured from Gunshots (not deceased)" - that is the non-fatal shooting count. What are the YTD ${yr-1} and YTD ${yr} values in that row? Also look for any date range shown (e.g. "Jan. 1 - Feb. 14, ${yr}"). Reply with ONLY: PRIOR=N YTD=N ASOF=YYYY-MM-DD (use the end date of the range for ASOF, or null if not found)` }
+          { type: 'text', text: `This is a Hampton VA gunshot injury data table. Find the row "Persons Injured from Gunshots (not deceased)" - that is the non-fatal shooting count. What are the YTD ${yr-1} and YTD ${yr} values in that row? For the as-of date, look at the BOTTOM of the image for "Last updated through M/DD/YY" - convert that to YYYY-MM-DD (note: "1/31/26" means 2026-01-31, NOT 2025). If no "Last updated" line, use the end date of the date range in the title. Reply with ONLY: PRIOR=N YTD=N ASOF=YYYY-MM-DD` }
         ]
       }]
     });
