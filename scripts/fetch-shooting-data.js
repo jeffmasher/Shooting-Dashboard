@@ -384,18 +384,8 @@ async function fetchMemphis() {
 
   const yr = new Date().getFullYear();
 
-  // Power BI renders the Non-Fatal Shooting bar chart with a title area showing
-  // "2026: 70" and "2025: 97 (-27.84%)" — but this may be SVG text not in innerText.
-  // The "Year To Date" section lists years and values separately but values are NOT
-  // in year order (they follow DOM render order, not chronological).
-  // Strategy priority: title text → vision API fallback.
   let ytd = null, prior = null;
 
-  // Strategy 1: Chart title shows "2026: 70" and "2025: 97 (-27.84%)"
-  // CRITICAL: Power BI concatenates these on ONE line with NO separator:
-  //   "2026: 702025: 97 (-27.84%)"
-  // Greedy \d+ would capture "702025" instead of "70".
-  // Use lazy \d+? with lookahead: stop before next YYYY:, whitespace, or paren.
   var ytdMatch = chartText.match(new RegExp(yr + ':\\s*(\\d+?)(?=\\d{4}:|\\s|\\(|$)'));
   var priorMatch = chartText.match(new RegExp((yr-1) + ':\\s*(\\d+?)(?=\\d{4}:|\\s|\\(|$)'));
   if (ytdMatch) {
@@ -407,14 +397,11 @@ async function fetchMemphis() {
     console.log('Memphis: found prior from title: ' + (yr-1) + ': ' + prior);
   }
 
-  // Sanity check: shooting counts should be 0-999 for YTD
   if (ytd !== null && ytd > 999) {
     console.log('Memphis: implausible ytd=' + ytd + ', resetting to null for vision fallback');
     ytd = null;
   }
 
-  // Strategy 2 (fallback): Screenshot + Vision API
-  // The chart is a simple bar chart with values above each bar and years on x-axis.
   if (ytd === null) {
     console.log('Memphis: text parsing failed, using vision API...');
     const base64Image = screenshotBuf.toString('base64');
@@ -457,73 +444,6 @@ async function fetchMemphis() {
   return { ytd, prior, asof };
 }
 
-// ─── Hampton (JPEG image) ─────────────────────────────────────────────────────
-
-async function fetchHampton() {
-  // Hampton posts a JPEG table at a fixed URL - use Claude vision to extract numbers
-  const jpegUrl = 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=';
-  console.log('Hampton: fetching JPEG from', jpegUrl);
-
-  const resp = await fetchUrl(jpegUrl);
-  if (resp.status !== 200) throw new Error(`Hampton JPEG HTTP ${resp.status}`);
-
-  const base64Image = resp.body.toString('base64');
-  // Detect media type - likely JPEG but confirm
-  const mediaType = resp.body[0] === 0xFF && resp.body[1] === 0xD8 ? 'image/jpeg' : 'image/png';
-  console.log('Hampton: image size:', resp.body.length, 'bytes, type:', mediaType);
-
-  const claudeData = await new Promise((resolve, reject) => {
-    const yr = new Date().getFullYear();
-    const body = JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 256,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mediaType, data: base64Image } },
-          { type: 'text', text: `This is a Hampton VA gunshot injury data table. Find the row "Persons Injured from Gunshots (not deceased)" - that is the non-fatal shooting count. What are the YTD ${yr-1} and YTD ${yr} values in that row? For the as-of date, look at the BOTTOM of the image for "Last updated through M/DD/YY" - convert that to YYYY-MM-DD (note: "1/31/26" means 2026-01-31, NOT 2025). If no "Last updated" line, use the end date of the date range in the title. Reply with ONLY: PRIOR=N YTD=N ASOF=YYYY-MM-DD` }
-        ]
-      }]
-    });
-    const req = require('https').request({
-      hostname: 'api.anthropic.com',
-      path: '/v1/messages',
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': process.env.ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    }, (res) => {
-      const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        try { resolve(JSON.parse(Buffer.concat(chunks).toString())); }
-        catch(e) { reject(e); }
-      });
-    });
-    req.on('error', reject);
-    req.write(body);
-    req.end();
-  });
-
-  const responseText = claudeData.content?.[0]?.text || '';
-  console.log('Hampton vision response:', responseText);
-
-  const priorMatch = responseText.match(/PRIOR=(\d+)/);
-  const ytdMatch   = responseText.match(/YTD=(\d+)/);
-  const asofMatch  = responseText.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
-
-  if (!ytdMatch) throw new Error('Could not parse Hampton values. Response: ' + responseText);
-
-  return {
-    ytd:   parseInt(ytdMatch[1]),
-    prior: priorMatch ? parseInt(priorMatch[1]) : null,
-    asof:  asofMatch ? asofMatch[1] : null
-  };
-}
-
 
 // ─── Pittsburgh (Power BI Gov) ───────────────────────────────────────────────
 
@@ -537,10 +457,8 @@ async function fetchPittsburgh() {
   const url = 'https://app.powerbigov.us/view?r=eyJrIjoiMDYzNWMyNGItNWNjMS00ODMwLWIxZDgtMTNkNzhlZDE2OWFjIiwidCI6ImY1ZjQ3OTE3LWM5MDQtNDM2OC05MTIwLWQzMjdjZjE3NTU5MSJ9';
   console.log('Pittsburgh: loading Power BI dashboard...');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  // Power BI Gov renders via canvas/iframe - wait generously for initial load
   await page.waitForTimeout(20000);
 
-  // Get as-of date from page 1 header "Last Updated: M/DD/YYYY"
   const page1Text = await page.evaluate(() => document.body.innerText);
   const dateMatch = page1Text.match(/Last Updated[:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   let asof = null;
@@ -550,7 +468,6 @@ async function fetchPittsburgh() {
   console.log('Pittsburgh asof:', asof);
   console.log('Pittsburgh page1 snippet:', page1Text.substring(0, 400));
 
-  // Navigate to "Year to Date Stats" page - try multiple selectors
   console.log('Pittsburgh: navigating to Year to Date Stats page...');
   let navigated = false;
   for (const selector of [
@@ -569,25 +486,17 @@ async function fetchPittsburgh() {
   }
   if (!navigated) console.log('Pittsburgh: could not navigate, will screenshot current page');
 
-  // Log what page we're on now
   const page2Text = await page.evaluate(() => document.body.innerText);
   console.log('Pittsburgh post-nav snippet:', page2Text.substring(0, 400));
 
-  // Note: Gun legend click was attempted but Power BI Gov does not update
-  // the accessibility tree when cross-filtering, so we read all-weapon totals.
-  // (Guns are ~93% of incidents so this is a close approximation of gun-only.)
-
-  // Parse values directly from page text
   const pageText = await page.evaluate(() => document.body.innerText);
   await browser.close();
   await browser.close();
 
   const yr = new Date().getFullYear();
 
-  // Extract homicides: find "Number of Homicides" section, grab yr and yr-1 values
   let homYtd = null, homPrior = null, nfsYtd = null, nfsPrior = null;
 
-  // Pattern: after "Number of Homicides", lines are: "Select Row\nYEAR\nVALUE\n..."
   const homSection = pageText.match(/Number of Homicides[\s\S]*?Number of Non-Fatal/);
   if (homSection) {
     const rows = homSection[0].matchAll(/(\d{4})\n(\d+)\n/g);
@@ -597,7 +506,6 @@ async function fetchPittsburgh() {
     }
   }
 
-  // Pattern: after "Number of Non-Fatal Shootings"
   const nfsSection = pageText.match(/Number of Non-Fatal Shootings[\s\S]*?(?:Last 28|YTD %|$)/);
   if (nfsSection) {
     const rows = nfsSection[0].matchAll(/(\d{4})\n(\d+)\n/g);
@@ -607,12 +515,9 @@ async function fetchPittsburgh() {
     }
   }
 
-  // Fallback: scan for year+value pairs near the table headers
   if (homYtd === null || nfsYtd === null) {
-    // Try alternate parsing: "Select Row\n2026\n4\n-33.33%"
     const allRows = [...pageText.matchAll(/Select Row\s+(\d{4})\s+(\d+)\s+[-\d.]+%/g)];
     console.log('Pittsburgh fallback rows:', allRows.map(r => `${r[1]}=${r[2]}`).join(', '));
-    // First set of year rows = homicides, second set = non-fatal
     const yrRows = allRows.filter(r => parseInt(r[1]) === yr);
     const priorRows = allRows.filter(r => parseInt(r[1]) === yr - 1);
     if (yrRows.length >= 2) {
@@ -654,12 +559,10 @@ async function fetchBuffalo() {
     await locator.click({ force: true, timeout: timeout || 8000 });
   }
 
-  // Step 1: Load dashboard
   console.log('Buffalo: loading GIVE dashboard...');
   await page.goto('https://mypublicdashboard.ny.gov/t/OJRP_PUBLIC/views/GIVEInitiative/GIVE-LandingPage', { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(10000);
 
-  // Step 2: Click GIVE-Shooting Activity tab
   console.log('Buffalo: clicking Shooting Activity tab...');
   try {
     await forceClick(page.locator('text=GIVE-Shooting Activity').first());
@@ -667,7 +570,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: on Shooting Activity tab');
   } catch(e) { console.log('Buffalo: tab click failed:', e.message); }
 
-  // Step 3: Open Jurisdiction dropdown (second (All) on page)
   console.log('Buffalo: opening Jurisdiction dropdown...');
   try {
     const allEls = page.locator('text=(All)');
@@ -678,7 +580,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: jurisdiction dropdown opened');
   } catch(e) { console.log('Buffalo: jurisdiction open failed:', e.message); }
 
-  // Step 4: Deselect all inside dropdown
   console.log('Buffalo: deselecting all...');
   try {
     const allEls = page.locator('text=(All)');
@@ -689,7 +590,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: deselected all');
   } catch(e) { console.log('Buffalo: deselect all failed:', e.message); }
 
-  // Step 5: Select Buffalo City PD
   console.log('Buffalo: selecting Buffalo City PD...');
   try {
     await forceClick(page.locator('text=Buffalo City PD').first());
@@ -697,7 +597,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: selected Buffalo City PD');
   } catch(e) { console.log('Buffalo: Buffalo City PD click failed:', e.message); }
 
-  // Step 6: Click Apply
   console.log('Buffalo: clicking Apply...');
   try {
     await forceClick(page.locator('text=Apply').first());
@@ -705,7 +604,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: applied filter');
   } catch(e) { console.log('Buffalo: Apply failed:', e.message); }
 
-  // Step 7: Click Monthly Data toggle
   console.log('Buffalo: clicking Monthly Data...');
   try {
     await forceClick(page.locator('text=Monthly Data').first());
@@ -713,7 +611,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: switched to Monthly Data');
   } catch(e) { console.log('Buffalo: Monthly Data click failed:', e.message); }
 
-  // Step 8: Click Download toolbar button
   console.log('Buffalo: clicking Download toolbar button...');
   try {
     await forceClick(page.locator('[data-tb-test-id="viz-viewer-toolbar-button-download"]').first());
@@ -721,7 +618,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: download menu opened');
   } catch(e) { console.log('Buffalo: download button failed:', e.message); }
 
-  // Step 9: Click Crosstab
   console.log('Buffalo: clicking Crosstab...');
   try {
     await forceClick(page.locator('text=Crosstab').first());
@@ -729,7 +625,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: crosstab dialog opened');
   } catch(e) { console.log('Buffalo: Crosstab click failed:', e.message); }
 
-  // Step 10: Select Monthly Total Overview sheet
   console.log('Buffalo: selecting Monthly Total Overview...');
   try {
     await forceClick(page.locator('text=Monthly Total Overview').first(), 5000);
@@ -737,7 +632,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: selected Monthly Total Overview');
   } catch(e) { console.log('Buffalo: sheet selection failed:', e.message); }
 
-  // Step 11: Select CSV
   console.log('Buffalo: selecting CSV...');
   try {
     await forceClick(page.locator('text=CSV').first(), 5000);
@@ -745,7 +639,6 @@ async function fetchBuffalo() {
     console.log('Buffalo: CSV selected');
   } catch(e) { console.log('Buffalo: CSV select failed:', e.message); }
 
-  // Step 12: Download and capture file
   console.log('Buffalo: clicking Download button...');
   let csvText = null;
   try {
@@ -760,7 +653,6 @@ async function fetchBuffalo() {
       stream.on('end', res);
       stream.on('error', rej);
     });
-    // File is UTF-16 LE with BOM, tab-delimited, long format
     const buf = Buffer.concat(chunks);
     csvText = buf.toString('utf16le').replace(/^\uFEFF/, '');
     console.log('Buffalo: CSV downloaded, bytes:', buf.length);
@@ -773,9 +665,6 @@ async function fetchBuffalo() {
 
   if (!csvText) throw new Error('Buffalo: could not download CSV');
 
-  // Format: tab-delimited, long format
-  // Columns: Month | Shooting Category | Count
-  // Each row is duplicated — take first occurrence only
   const janCurr  = 'Jan-' + String(yr).slice(2);
   const janPrior = 'Jan-' + String(yr - 1).slice(2);
 
@@ -823,7 +712,6 @@ async function fetchBuffalo() {
 }
 
 
-
 async function fetchMiamiDade() {
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: true });
@@ -831,13 +719,11 @@ async function fetchMiamiDade() {
   await page.setViewportSize({ width: 1536, height: 768 });
   page.setDefaultTimeout(30000);
 
-  // Load the wrapper page and find the Power BI iframe src
   const url = 'https://www.miamidade.gov/global/police/crime-stats.page';
   console.log('MiamiDade: loading wrapper page...');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(10000);
 
-  // Find iframe src containing powerbi
   const iframeSrc = await page.evaluate(() => {
     const frames = Array.from(document.querySelectorAll('iframe'));
     const pbi = frames.find(f => f.src && f.src.includes('powerbi'));
@@ -846,14 +732,12 @@ async function fetchMiamiDade() {
   console.log('MiamiDade iframe src:', iframeSrc);
 
   if (!iframeSrc) {
-    // Log page source snippet to help debug
     const src = await page.content();
     console.log('MiamiDade page source snippet:', src.substring(0, 2000));
     await browser.close();
     throw new Error('Could not find Power BI iframe on Miami-Dade page');
   }
 
-  // Navigate directly to the Power BI embed
   console.log('MiamiDade: loading Power BI embed directly...');
   await page.goto(iframeSrc, { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForTimeout(20000);
@@ -861,7 +745,6 @@ async function fetchMiamiDade() {
   const page1Text = await page.evaluate(() => document.body.innerText);
   console.log('MiamiDade PBI page1 sample:', page1Text.substring(0, 600));
 
-  // Extract as-of date from "Last update date: MM/DD/YYYY"
   const dateMatch = page1Text.match(/Last update dat[ae][:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   let asof = null;
   if (dateMatch) {
@@ -869,7 +752,6 @@ async function fetchMiamiDade() {
   }
   console.log('MiamiDade asof:', asof);
 
-  // Navigate to page 3 by clicking next twice
   console.log('MiamiDade: navigating to page 3...');
   for (let i = 0; i < 2; i++) {
     try {
@@ -877,7 +759,6 @@ async function fetchMiamiDade() {
       await page.waitForTimeout(5000);
       console.log(`MiamiDade: clicked next (${i+1}/2)`);
     } catch(e) {
-      // Try aria-label next button
       try {
         await page.locator('[aria-label="Next page"]').first().click({ force: true, timeout: 3000 });
         await page.waitForTimeout(5000);
@@ -892,7 +773,6 @@ async function fetchMiamiDade() {
   console.log('MiamiDade page3 sample:', page3Text.substring(0, 1000));
   await browser.close();
 
-  // Try to get asof from page3 if page1 didn't have it
   if (!asof) {
     const dateMatch3 = page3Text.match(/Last update dat[ae][:\s]+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
     if (dateMatch3) {
@@ -904,7 +784,6 @@ async function fetchMiamiDade() {
   const yr = new Date().getFullYear();
   let ytd = null, prior = null;
 
-  // Strategy 1: find SHOOTINGS followed by number+percent pairs
   const shootMatch = page3Text.match(/SHOOTINGS[\s\S]{0,300}/i);
   if (shootMatch) {
     const nums = [...shootMatch[0].matchAll(/(\d+)\s+[-\d.]+%/g)];
@@ -913,7 +792,6 @@ async function fetchMiamiDade() {
     if (nums.length >= 2) prior = parseInt(nums[1][1]);
   }
 
-  // Strategy 2: line-by-line scan
   if (ytd === null) {
     const lines = page3Text.split('\n').map(l => l.trim()).filter(Boolean);
     for (let i = 0; i < lines.length; i++) {
@@ -941,17 +819,8 @@ async function fetchMiamiDade() {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 // ─── Omaha ─────────────────────────────────────────────────────────────────────
-// Fetches the OPD Non-Fatal Shootings and Homicides PDF and sums YTD V columns
 
 async function fetchOmaha() {
-  // Use Playwright to get the rendered page (JS-rendered links)
-  // The OPD site is fully JS-rendered so we can't scrape it.
-  // Instead, fetch the PDF directly using the known URL pattern.
-  // URL format: /images/crime-statistics-reports/2024/Website_-_Non-Fatal_Shootings_and_Homicides_MMDDYYYY.pdf
-  // We try recent dates going backwards from today to find the current file.
-  
-  // police.cityofomaha.org returns 403 from GitHub Actions IPs.
-  // Instead, commit the latest PDF to data/omaha-shootings.pdf and read it locally.
   const pdfPath = require('path').join(__dirname, '..', 'data', 'omaha-shootings.pdf');
   if (!require('fs').existsSync(pdfPath)) {
     throw new Error('Omaha PDF not found at data/omaha-shootings.pdf — please commit the latest PDF from https://police.cityofomaha.org/opd-crime-statistics');
@@ -959,7 +828,6 @@ async function fetchOmaha() {
   const pdfBuf = require('fs').readFileSync(pdfPath);
   console.log('Omaha PDF loaded from local file, size:', pdfBuf.length);
 
-  // Parse all pages to find the YTD row for current year
   let pdfjsLib;
   try { pdfjsLib = require('pdfjs-dist/legacy/build/pdf.js'); }
   catch(e) { pdfjsLib = require(require('path').join(__dirname, '..', 'node_modules', 'pdfjs-dist', 'legacy', 'build', 'pdf.js')); }
@@ -974,11 +842,8 @@ async function fetchOmaha() {
     allText += tc.items.map(i => i.str).join(' ') + '\n';
   }
 
-  // The PDF has rows like: 2026  NFS_I  NFS_V  HOM_I  HOM_V  (per month, then YTD at end)
-  // Strategy: find the "Last update" date for asof, then find the current year YTD values
   const yr = new Date().getFullYear();
 
-  // Extract asof from "Last update: Non-Fatal Shootings M/D/YYYY"
   const asofMatch = allText.match(/Last update[:\s]+Non-Fatal Shootings\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i)
     || allText.match(/Last update[:\s]+\S+\s+(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   let asof = null;
@@ -988,13 +853,8 @@ async function fetchOmaha() {
   }
   console.log('Omaha asof:', asof);
 
-  // Extract tokens as numbers for parsing
-  // The table structure per year row: YEAR NFS_I NFS_V HOM_I HOM_V (repeated per month) ... YTD_NFS_I YTD_NFS_V YTD_HOM_I YTD_HOM_V
-  // We need the YTD column which is the last set of 4 numbers in the current year row
-  // Find the year row: look for "2026" followed by sequences of numbers
   const tokens = allText.replace(/\s+/g, ' ').split(' ');
   
-  // Find index of the current year
   const yrIdx = tokens.findIndex(t => t === String(yr));
   const priorYrIdx = tokens.findIndex(t => t === String(yr - 1));
 
@@ -1010,8 +870,6 @@ async function fetchOmaha() {
     const nonZeroNums = nums.filter(n => n > 0);
     if (nonZeroNums.length >= 4) {
       const n = nonZeroNums.length;
-      // For current year: last 4 non-zero = YTD (NFS_I, NFS_V, HOM_I, HOM_V)
-      // For prior year: first 4 non-zero = Jan data (same-period comparison)
       if (useFirst) {
         return { nfsV: nonZeroNums[1], homV: nonZeroNums[3] };
       }
@@ -1036,12 +894,6 @@ async function fetchOmaha() {
 
 
 // ─── Minneapolis (ArcGIS FeatureServer) ──────────────────────────────────────
-// Queries the City of Minneapolis Crime_Data FeatureServer for "Gunshot Wound Victims"
-// which are tracked as rows with Type='Gunshot Wound Victims' and summed by Crime_Count.
-// Server-side fetch avoids CORS restrictions that block browser access.
-//
-// Source: https://opendata.minneapolismn.gov/datasets/cityoflakes::crime-data/about
-// API: services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Crime_Data/FeatureServer/0
 
 async function fetchMinneapolis() {
   const BASE = 'https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Crime_Data/FeatureServer/0/query';
@@ -1055,7 +907,6 @@ async function fetchMinneapolis() {
     return BASE + '?where=' + encodeURIComponent(where) + '&outStatistics=' + encodeURIComponent(stats) + '&f=json';
   }
 
-  // Get the latest Reported_Date to use as asof date
   async function fetchLatest() {
     const where = "Type = 'Gunshot Wound Victims'";
     const url = BASE + '?where=' + encodeURIComponent(where) +
@@ -1113,7 +964,6 @@ async function main() {
 
   const results = {};
 
-  // Helper: wrap a fetch with a timeout and catch errors without throwing
   function safe(name, fn, timeoutMs) {
     timeoutMs = timeoutMs || 120000;
     const timer = new Promise((_, reject) => setTimeout(() => reject(new Error(name + ' timed out after ' + (timeoutMs/1000) + 's')), timeoutMs));
@@ -1129,7 +979,6 @@ async function main() {
       });
   }
 
-  // Run all fetches in parallel
   console.log('Starting all fetches in parallel...');
   const fetches = await Promise.all([
     safe('Minneapolis', fetchMinneapolis, 60000),
@@ -1137,7 +986,6 @@ async function main() {
     safe('Durham',     fetchDurham,     60000),
     safe('Milwaukee',  fetchMilwaukee,  60000),
     safe('Memphis',    fetchMemphis,    120000),
-    safe('Hampton',    fetchHampton,    60000),
     safe('MiamiDade',  fetchMiamiDade,  120000),
     safe('Pittsburgh', fetchPittsburgh, 120000),
     safe('Portland',   fetchPortland,   60000),
@@ -1153,7 +1001,6 @@ async function main() {
     if (value.ok) {
       results[key] = value;
     } else if (existing[key] && existing[key].ok) {
-      // Keep previous good data when this run fails
       console.log(key + ': keeping previous good data (ytd=' + existing[key].ytd + ' asof=' + existing[key].asof + ')');
       results[key] = existing[key];
       results[key].stale = true;
@@ -1162,7 +1009,6 @@ async function main() {
     }
   }
 
-  // Write output
   if (!fs.existsSync(outDir)) fs.mkdirSync(outDir, { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(results, null, 2));
   console.log('\nWrote', outPath);
@@ -1173,9 +1019,6 @@ main().catch(e => { console.error(e); process.exit(1); });
 
 
 // ─── Portland (CSV from Tableau Public) ──────────────────────────────────────
-// Direct CSV download of all shooting incidents. Filter out "No Injury" rows,
-// count Homicide + Non-Fatal Injury by year. Fair YTD comparison uses max month
-// available in current year.
 
 async function fetchPortland() {
   const csvUrl = 'https://public.tableau.com/views/PPBOpenDataDownloads/Shootings.csv?:showVizHome=no';
@@ -1187,7 +1030,6 @@ async function fetchPortland() {
   const lines = text.split('\n');
   console.log('Portland: CSV lines:', lines.length);
 
-  // Parse header to find column indices
   const header = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
   const iYear = header.indexOf('Occur Year');
   const iMonth = header.indexOf('Occur Month');
@@ -1200,7 +1042,6 @@ async function fetchPortland() {
 
   const yr = new Date().getFullYear();
 
-  // Parse all non-"No Injury" rows
   const rows = [];
   for (let i = 1; i < lines.length; i++) {
     if (!lines[i].trim()) continue;
@@ -1214,12 +1055,10 @@ async function fetchPortland() {
   }
   console.log('Portland: qualifying rows (excl No Injury):', rows.length);
 
-  // Find max month in current year for fair comparison
   let maxMonth = 0;
   rows.forEach(r => { if (r.year === yr && r.month > maxMonth) maxMonth = r.month; });
   console.log('Portland: max month in ' + yr + ':', maxMonth);
 
-  // Count YTD and prior, only up to maxMonth
   let ytd = 0, prior = 0;
   rows.forEach(r => {
     if (r.month > maxMonth) return;
@@ -1227,7 +1066,6 @@ async function fetchPortland() {
     if (r.year === yr - 1) prior++;
   });
 
-  // Derive asof as last day of maxMonth in current year
   let asof = null;
   if (maxMonth > 0) {
     const lastDay = new Date(yr, maxMonth, 0).getDate();
@@ -1241,8 +1079,6 @@ async function fetchPortland() {
 
 
 // ─── Denver (Power BI - Firearm Homicides + Non-Fatal Shootings) ─────────────
-// Embedded Power BI on Denver PD Performance page. Page 3 ("Firearm Homicide")
-// shows combined Firearm Homicides + Non-Fatal Shooting Victims YTD vs prior.
 
 async function fetchDenver() {
   const { chromium } = require('playwright');
@@ -1251,7 +1087,6 @@ async function fetchDenver() {
   await page.setViewportSize({ width: 1536, height: 900 });
   page.setDefaultTimeout(30000);
 
-  // Load the Power BI embed directly
   const url = 'https://app.powerbigov.us/view?r=eyJrIjoiOWMwZjg0MGYtODI0ZC00ZGVjLThmNjEtMzExZDI3OGUzYzQyIiwidCI6IjM5Yzg3YWIzLTY2MTItNDJjMC05NjIwLWE2OTZkMTJkZjgwMyJ9';
   console.log('Denver: loading Power BI embed directly...');
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
@@ -1260,7 +1095,6 @@ async function fetchDenver() {
   const page1Text = await page.evaluate(() => document.body.innerText);
   console.log('Denver page1 sample:', page1Text.substring(0, 600));
 
-  // Navigate to page 3 ("Firearm Homicide..." tab) by clicking next twice
   console.log('Denver: navigating to page 3...');
   for (let i = 0; i < 2; i++) {
     try {
@@ -1282,7 +1116,6 @@ async function fetchDenver() {
   const page3Text = await page.evaluate(() => document.body.innerText);
   console.log('Denver page3 sample:', page3Text.substring(0, 1000));
 
-  // Extract Last Updated date
   let asof = null;
   const dateMatch = page3Text.match(/Last Updated[:\s]*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   if (dateMatch) {
@@ -1290,11 +1123,9 @@ async function fetchDenver() {
   }
   console.log('Denver asof:', asof);
 
-  // Try text-based extraction first
   const yr = new Date().getFullYear();
   let ytd = null, prior = null;
 
-  // Look for "Firearm Homicides + Non-Fatal Shooting Victims YYYY YTD" followed by number
   const ytdMatch = page3Text.match(new RegExp('Firearm Homicides \\+ Non-Fatal Shooting Victims ' + yr + ' YTD[\\s\\n]+(\\d+)', 'i'));
   const priorMatch = page3Text.match(new RegExp('Firearm Homicides \\+ Non-Fatal Shooting Victims ' + (yr-1) + ' YTD[\\s\\n]+(\\d+)', 'i'));
 
@@ -1302,12 +1133,10 @@ async function fetchDenver() {
   if (priorMatch) prior = parseInt(priorMatch[1]);
   console.log('Denver text parse: ytd=' + ytd + ' prior=' + prior);
 
-  // Strategy 2: look for the numbers near the labels
   if (ytd === null) {
     const lines = page3Text.split('\n').map(l => l.trim()).filter(Boolean);
     for (let i = 0; i < lines.length; i++) {
       if (/Firearm Homicides.*Non-Fatal.*\d{4}\s*YTD/i.test(lines[i])) {
-        // Check surrounding lines for numbers
         for (let j = Math.max(0, i-2); j < Math.min(lines.length, i+3); j++) {
           if (/^\d+$/.test(lines[j])) {
             if (lines[i].includes(String(yr)) && ytd === null) ytd = parseInt(lines[j]);
@@ -1319,7 +1148,6 @@ async function fetchDenver() {
     console.log('Denver line-scan: ytd=' + ytd + ' prior=' + prior);
   }
 
-  // Strategy 3: vision fallback
   if (ytd === null || prior === null) {
     console.log('Denver: falling back to vision API...');
     const screenshotBuf = await page.screenshot({ fullPage: false });
@@ -1373,9 +1201,6 @@ async function fetchDenver() {
 
 
 // ─── Portsmouth (Power BI - GSW Victims) ─────────────────────────────────────
-// Direct Power BI embed. Shows bar chart of GSW Victims by year with YTD tab.
-// Need to sum Non-Fatal (yellow) + Fatal Non-Suicide (red) for current and prior year.
-// Chart-based data, so vision API is the primary strategy.
 
 async function fetchPortsmouth() {
   const { chromium } = require('playwright');
@@ -1392,14 +1217,12 @@ async function fetchPortsmouth() {
   const bodyText = await page.evaluate(() => document.body.innerText);
   console.log('Portsmouth page sample:', bodyText.substring(0, 800));
 
-  // Try to extract date from text
   let asof = null;
   const dateMatch = bodyText.match(/(?:Last\s+(?:Database\s+)?Update[d]?|Updated)[:\s]*(\d{1,2})\/(\d{1,2})\/(\d{4})/i);
   if (dateMatch) {
     asof = `${dateMatch[3]}-${dateMatch[1].padStart(2,'0')}-${dateMatch[2].padStart(2,'0')}`;
   }
 
-  // Screenshot for vision API (chart data needs visual reading)
   const screenshotBuf = await page.screenshot({ fullPage: false });
   await browser.close();
   console.log('Portsmouth: screenshot taken, size:', screenshotBuf.length, 'bytes');
@@ -1447,7 +1270,6 @@ async function fetchPortsmouth() {
   let visionText = (resp.content?.[0]?.text || '').trim();
   console.log('Portsmouth vision response:', visionText);
 
-  // Retry if empty
   for (let retry = 1; retry <= 2 && !visionText.includes('TOTAL='); retry++) {
     console.log('Portsmouth: retrying vision call attempt ' + retry + '...');
     await new Promise(r => setTimeout(r, 3000));
@@ -1474,11 +1296,9 @@ async function fetchPortsmouth() {
   console.log('Portsmouth parsed: ' + yr + ' T=' + (ytdTotal?.[1]||'?') + ' S=' + (ytdSui?.[1]||'?') +
     ' | ' + (yr-1) + ' T=' + (prTotal?.[1]||'?') + ' S=' + (prSui?.[1]||'?'));
 
-  // YTD = Total minus Suicide
   const ytd = (ytdTotal && ytdSui) ? parseInt(ytdTotal[1]) - parseInt(ytdSui[1]) : null;
   const prior = (prTotal && prSui) ? parseInt(prTotal[1]) - parseInt(prSui[1]) : null;
 
-  // Extract ASOF from vision response if DOM parsing missed it
   if (!asof) {
     const asofV = visionText.match(/ASOF=(\d{4}-\d{2}-\d{2})/);
     if (asofV) asof = asofV[1];
@@ -1491,25 +1311,19 @@ async function fetchPortsmouth() {
 
 
 // ─── Hartford (CompStat PDF) ─────────────────────────────────────────────────
-// Weekly CompStat report, published with predictable URL based on week-ending Saturday.
-// URL pattern: https://www.hartfordct.gov/files/assets/public/v/1/police/police-documents/compstat/{YYYY}/{MM}/we-{MM}-{DD}-{YY}.pdf
-// Page 2: Citywide table with "Murder Victims" and "Non_Fatal Shooting Victims" under YTD columns.
 
 async function fetchHartford() {
-  // Generate week-ending Saturday dates to try (most recent first)
   function getWeekEndingSaturdays() {
     const dates = [];
     const now = new Date();
     for (let i = 0; i < 8; i++) {
       const d = new Date(now);
-      d.setDate(d.getDate() - d.getDay() - 1 - (7 * i)); // Previous Saturday
+      d.setDate(d.getDate() - d.getDay() - 1 - (7 * i));
       dates.push(d);
     }
     return dates;
   }
 
-  // Use /v/1/ - the site redirects to the current version automatically
-  // (Playwright handles the redirect; raw HTTP gets blocked by WAF with 403)
   function buildUrl(d) {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1522,9 +1336,6 @@ async function fetchHartford() {
     return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
   }
 
-  // Use Playwright to download PDF.
-  // - context.request.fetch for HEAD: server-side HTTP, bypasses CORS (page.evaluate fetch fails)
-  // - acceptDownloads + waitForEvent('download'): PDF URLs trigger browser download, not navigation
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ acceptDownloads: true });
@@ -1539,13 +1350,11 @@ async function fetchHartford() {
       const url = buildUrl(d);
       console.log('Hartford: trying', url);
       try {
-        // Server-side HEAD check — no CORS, fast 404 detection
         const probe = await context.request.fetch(url, { method: 'HEAD', timeout: 10000 }).catch(() => null);
         const probeStatus = probe ? probe.status() : 0;
         console.log('Hartford:   status=' + probeStatus);
         if (probeStatus !== 200) continue;
 
-        // File exists — intercept the download event
         const [download] = await Promise.all([
           page.waitForEvent('download', { timeout: 30000 }),
           page.goto(url, { waitUntil: 'commit', timeout: 30000 }).catch(() => {})
@@ -1569,13 +1378,9 @@ async function fetchHartford() {
 
   if (!pdfBuffer) throw new Error('Hartford: could not download any recent CompStat PDF');
 
-  // Extract tokens from page 2 (Citywide table)
   const tokens = await extractPdfTokens(pdfBuffer, 2);
   const joined = tokens.join(' ');
 
-  // Parse a Victim Counts row by label
-  // Each row has 13 values after the label:
-  // CW2026 CW2025 CW+/- PW2026 PW+/- 28D2026 28D2025 28D+/- YTD2026 YTD2025 YTD+/- 2Y2024 2Y+/-
   function parseVictimRow(label) {
     var idx = joined.indexOf(label);
     if (idx === -1) return { ytd2026: 0, ytd2025: 0 };
@@ -1596,7 +1401,6 @@ async function fetchHartford() {
   var ytd = nonfatal.ytd2026;
   var prior = nonfatal.ytd2025;
 
-  // Try to get as-of from PDF text (more reliable than URL date)
   var ytdMatch = joined.match(/Year\s+to\s+Date.*?to\s+(\w+)\s+(\d{1,2}),?\s+(\d{4})/i);
   if (ytdMatch) {
     var months = {jan:1,january:1,feb:2,february:2,mar:3,march:3,apr:4,april:4,may:5,jun:6,june:6,jul:7,july:7,aug:8,august:8,sep:9,september:9,oct:10,october:10,nov:11,november:11,dec:12,december:12};
@@ -1609,28 +1413,16 @@ async function fetchHartford() {
 
 
 // ─── Nashville (MNPD Crime Initiative Book PDF) ─────────────────────────────
-// Downloads the weekly Crime Initiative Book PDF from MNPD's public SharePoint
-// and extracts YTD shooting data from the "Gunshot Victims" page (~p.146).
-// Uses group-based triplet validation to reliably parse (prior, current, change)
-// values while naturally filtering out percentage columns.
-//
-// Source: https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public
-// PDF: YYYYMMDD_Crime_Initiative_Book.pdf (published weekly, typically Friday)
-// Page: ~146 "Gunshot Victims (Homicides, Injuries, and Property Damage)"
 
 async function fetchNashville() {
 
-  // ── Date utilities ──
-  // Reports use Saturday dates in the filename: YYYYMMDD
   function getReportDatesToTry() {
     const dates = [];
     const now = new Date();
     for (let weeksBack = 0; weeksBack <= 4; weeksBack++) {
-      // Find recent Saturdays
       const sat = new Date(now);
       sat.setDate(sat.getDate() - sat.getDay() - 1 - (7 * weeksBack));
       dates.push(formatDateStr(sat));
-      // Also try Fridays
       const fri = new Date(sat);
       fri.setDate(fri.getDate() - 1);
       dates.push(formatDateStr(fri));
@@ -1642,7 +1434,6 @@ async function fetchNashville() {
     return d.getFullYear() + String(d.getMonth()+1).padStart(2,'0') + String(d.getDate()).padStart(2,'0');
   }
 
-  // ── PDF download strategies ──
   const downloadDir = path.join(__dirname, '..', 'data', 'nashville-downloads');
   if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
 
@@ -1651,13 +1442,11 @@ async function fetchNashville() {
     const filename = `${dateStr}_Crime_Initiative_Book.pdf`;
     const localPath = path.join(downloadDir, filename);
 
-    // Check for already-downloaded file
     if (fs.existsSync(localPath) && fs.statSync(localPath).size > 100000) {
       console.log('Nashville: using cached PDF:', filename);
       return localPath;
     }
 
-    // Strategy 1: Direct HTTP fetch (works if SharePoint allows anonymous access)
     const directUrls = [
       `https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public/Shared%20Documents/Weekly%20Crime%20-%20Initiative%20Book/${year}/${filename}`,
       `https://metronashville.sharepoint.com/sites/MNPDCrimeAnalysis-Public/_layouts/15/download.aspx?SourceUrl=/sites/MNPDCrimeAnalysis-Public/Shared%20Documents/Weekly%20Crime%20-%20Initiative%20Book/${year}/${filename}`,
@@ -1675,7 +1464,6 @@ async function fetchNashville() {
       } catch (e) { /* try next */ }
     }
 
-    // Strategy 2: Playwright (navigate SharePoint UI)
     try {
       console.log('Nashville: trying Playwright for', dateStr, '...');
       const { chromium } = require('playwright');
@@ -1683,7 +1471,6 @@ async function fetchNashville() {
       const page = await browser.newPage();
       await page.setViewportSize({ width: 1920, height: 1080 });
 
-      // Try loading the direct URL in Playwright (handles JS redirects SharePoint may do)
       const spUrl = directUrls[0];
       const response = await page.goto(spUrl, { waitUntil: 'networkidle', timeout: 45000 }).catch(() => null);
 
@@ -1700,26 +1487,22 @@ async function fetchNashville() {
         }
       }
 
-      // Navigate the SharePoint share link folder UI
       const shareLink = 'https://metronashville.sharepoint.com/:f:/s/MNPDCrimeAnalysis-Public/Ei-WvJMw8N5OiETXZcnTwlgBlnNytrIMj_wiYADfzMln9g?e=L5g6b2';
       console.log('Nashville: navigating SharePoint folder UI...');
       await page.goto(shareLink, { waitUntil: 'networkidle', timeout: 60000 }).catch(() => {});
       await page.waitForTimeout(5000);
 
-      // Click into the year folder
       const yearEl = await page.locator(`text=${year}`).first();
       if (await yearEl.isVisible({ timeout: 5000 }).catch(() => false)) {
         await yearEl.click();
         await page.waitForTimeout(5000);
       }
 
-      // Click the PDF file
       const fileEl = await page.locator(`text=${dateStr}`).first();
       if (await fileEl.isVisible({ timeout: 5000 }).catch(() => false)) {
         await fileEl.click();
         await page.waitForTimeout(3000);
 
-        // Find and click download button
         for (const sel of ['[data-automationid="downloadCommand"]', '[aria-label*="Download"]', 'button:has-text("Download")']) {
           try {
             const btn = await page.locator(sel).first();
@@ -1756,10 +1539,8 @@ async function fetchNashville() {
     return null;
   }
 
-  // ── Try to get a PDF ──
   let pdfPath = null;
 
-  // Check for any pre-committed PDF in data/nashville-downloads/
   if (fs.existsSync(downloadDir)) {
     const existing = fs.readdirSync(downloadDir)
       .filter(f => f.endsWith('.pdf') && f.includes('Crime_Initiative_Book'))
@@ -1770,7 +1551,6 @@ async function fetchNashville() {
     }
   }
 
-  // Try downloading the latest if no local file
   if (!pdfPath) {
     const datesToTry = getReportDatesToTry();
     console.log('Nashville: trying dates:', datesToTry.slice(0, 6).join(', '));
@@ -1784,7 +1564,6 @@ async function fetchNashville() {
     throw new Error('Nashville: could not obtain Crime Initiative Book PDF. Place it manually in data/nashville-downloads/');
   }
 
-  // ── Parse the PDF using pdfjs-dist (same lib used by Detroit/Durham) ──
   console.log('Nashville: parsing', path.basename(pdfPath));
   const pdfBuffer = fs.readFileSync(pdfPath);
   let pdfjsLib;
@@ -1794,12 +1573,10 @@ async function fetchNashville() {
   const pdf = await pdfjsLib.getDocument({ data: new Uint8Array(pdfBuffer) }).promise;
   console.log('Nashville: PDF has', pdf.numPages, 'pages');
 
-  // Extract text from each page (group by y-coordinate to preserve lines)
   const pages = [];
   for (let i = 1; i <= pdf.numPages; i++) {
     const pg = await pdf.getPage(i);
     const tc = await pg.getTextContent();
-    // Group items by y-coordinate to reconstruct lines
     let lastY = null;
     let text = '';
     for (const item of tc.items) {
@@ -1815,18 +1592,15 @@ async function fetchNashville() {
     pages.push(text);
   }
 
-  // Find the Gunshot Victims page
   const targetIdx = findGunShotVictimsPage(pages);
   if (targetIdx === -1) {
     throw new Error('Nashville: could not find "Gunshot Victims" page in PDF');
   }
   console.log('Nashville: found Gunshot Victims page at page', targetIdx + 1);
 
-  // Parse the page
   const pageText = pages[targetIdx];
   const parsed = parseGunShotVictimsPage(pageText);
 
-  // Extract report date from filename
   let asof = null;
   const dateMatch = path.basename(pdfPath).match(/(\d{8})/);
   if (dateMatch) {
@@ -1846,11 +1620,8 @@ async function fetchNashville() {
   return { ytd, prior, asof };
 }
 
-// ── Nashville PDF parser helpers ──
-
 function findGunShotVictimsPage(pages) {
-  // Search expected page 146 first, then nearby, then full scan
-  const expected = 145; // 0-indexed
+  const expected = 145;
   const searchOrder = [expected];
   for (let offset = 1; offset <= 15; offset++) {
     searchOrder.push(expected + offset);
@@ -1873,12 +1644,6 @@ function findGunShotVictimsPage(pages) {
   return -1;
 }
 
-/**
- * Parse the Gunshot Victims page.
- * Uses group-based triplet validation: finds sequences of (prior, current, change)
- * where change = current - prior. The 3rd such group in each row is the YTD data.
- * Percentage values naturally don't form valid triplets, so they're skipped.
- */
 function parseGunShotVictimsPage(pageText) {
   const lines = pageText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
 
@@ -1888,7 +1653,6 @@ function parseGunShotVictimsPage(pageText) {
     propertyDamage: { current: null, prior: null, change: null },
   };
 
-  // Find County section (totals)
   let countyStart = -1;
   for (let i = 0; i < lines.length; i++) {
     if (/\bCounty\b/i.test(lines[i])) { countyStart = i; break; }
@@ -1929,10 +1693,6 @@ function nashvilleExtractNumbers(text) {
   return results;
 }
 
-/**
- * Find valid (prior, current, change) triplets where change = current - prior.
- * Percentage values naturally don't form valid triplets, so they're skipped.
- */
 function nashvilleFindValidGroups(nums) {
   var groups = [];
   var i = 0;
