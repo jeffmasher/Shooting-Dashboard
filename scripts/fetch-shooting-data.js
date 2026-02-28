@@ -1035,6 +1035,74 @@ async function fetchOmaha() {
 }
 
 
+// ─── Minneapolis (ArcGIS FeatureServer) ──────────────────────────────────────
+// Queries the City of Minneapolis Crime_Data FeatureServer for "Gunshot Wound Victims"
+// which are tracked as rows with Type='Gunshot Wound Victims' and summed by Crime_Count.
+// Server-side fetch avoids CORS restrictions that block browser access.
+//
+// Source: https://opendata.minneapolismn.gov/datasets/cityoflakes::crime-data/about
+// API: services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Crime_Data/FeatureServer/0
+
+async function fetchMinneapolis() {
+  const BASE = 'https://services.arcgis.com/afSMGVsC7QlRK1kZ/arcgis/rest/services/Crime_Data/FeatureServer/0/query';
+  const CURRENT_YEAR = new Date().getFullYear();
+
+  function buildStatUrl(startDate, endDate) {
+    const where = "Type = 'Gunshot Wound Victims'" +
+      " AND Reported_Date >= TIMESTAMP '" + startDate + " 00:00:00'" +
+      " AND Reported_Date <= TIMESTAMP '" + endDate + " 23:59:59'";
+    const stats = JSON.stringify([{ statisticType: 'sum', onStatisticField: 'Crime_Count', outStatisticFieldName: 'total' }]);
+    return BASE + '?where=' + encodeURIComponent(where) + '&outStatistics=' + encodeURIComponent(stats) + '&f=json';
+  }
+
+  // Get the latest Reported_Date to use as asof date
+  async function fetchLatest() {
+    const where = "Type = 'Gunshot Wound Victims'";
+    const url = BASE + '?where=' + encodeURIComponent(where) +
+      '&outFields=Reported_Date&orderByFields=Reported_Date+DESC&resultRecordCount=1&f=json';
+    const resp = await fetchUrl(url, 20000);
+    if (resp.status !== 200) throw new Error('Minneapolis latest: HTTP ' + resp.status);
+    const d = JSON.parse(resp.body.toString('utf8'));
+    if (d.error) throw new Error('Minneapolis latest ArcGIS error: ' + (d.error.message || JSON.stringify(d.error).slice(0, 80)));
+    if (!d.features || !d.features.length) throw new Error('Minneapolis latest: no features returned');
+    const raw = d.features[0].attributes.Reported_Date;
+    if (typeof raw === 'number') {
+      const dt = new Date(raw);
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const dd = String(dt.getDate()).padStart(2, '0');
+      return dt.getFullYear() + '-' + mm + '-' + dd;
+    }
+    return String(raw).slice(0, 10).replace(/\//g, '-');
+  }
+
+  async function fetchSum(startDate, endDate) {
+    const url = buildStatUrl(startDate, endDate);
+    const resp = await fetchUrl(url, 20000);
+    if (resp.status !== 200) throw new Error('Minneapolis count: HTTP ' + resp.status);
+    const d = JSON.parse(resp.body.toString('utf8'));
+    if (d.error) throw new Error('Minneapolis ArcGIS error: ' + (d.error.message || JSON.stringify(d.error).slice(0, 80)));
+    if (!d.features || !d.features.length) return 0;
+    return d.features[0].attributes.total || 0;
+  }
+
+  console.log('Minneapolis: fetching latest date...');
+  const asof = await fetchLatest();
+  const asofYear = parseInt(asof.slice(0, 4));
+
+  const ytdStart = asofYear + '-01-01';
+  const priorStart = (asofYear - 1) + '-01-01';
+  const priorEnd = (asofYear - 1) + asof.slice(4);
+
+  console.log('Minneapolis: fetching YTD (' + ytdStart + ' to ' + asof + ') and prior (' + priorStart + ' to ' + priorEnd + ')...');
+  const [ytd, prior] = await Promise.all([
+    fetchSum(ytdStart, asof),
+    fetchSum(priorStart, priorEnd),
+  ]);
+
+  console.log('Minneapolis: asof=' + asof + ' ytd=' + ytd + ' prior=' + prior);
+  return { ytd, prior, asof };
+}
+
 async function main() {
   const fetchedAt = new Date().toISOString();
   const outDir = path.join(__dirname, '..', 'data');
@@ -1064,6 +1132,7 @@ async function main() {
   // Run all fetches in parallel
   console.log('Starting all fetches in parallel...');
   const fetches = await Promise.all([
+    safe('Minneapolis', fetchMinneapolis, 60000),
     safe('Detroit',    fetchDetroit,    120000),
     safe('Durham',     fetchDurham,     60000),
     safe('Milwaukee',  fetchMilwaukee,  60000),
