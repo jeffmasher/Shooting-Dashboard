@@ -3,91 +3,91 @@
     "ytd": 17,
     "prior": 36,
     "asof": "2026-02-25",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "detroit": {
     "ytd": 39,
     "prior": 57,
     "asof": "2026-02-26",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "durham": {
     "ytd": 16,
     "prior": 20,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "milwaukee": {
     "ytd": 47,
     "prior": 57,
     "asof": "2026-02-26",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "memphis": {
     "ytd": 77,
     "prior": 105,
     "asof": "2026-02-28",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "miamidade": {
     "ytd": 15,
     "prior": 27,
     "asof": "2026-02-20",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "pittsburgh": {
     "ytd": 10,
     "prior": 14,
     "asof": "2026-03-01",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "portland": {
     "ytd": 9,
     "prior": 13,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "buffalo": {
     "ytd": 39,
     "prior": 48,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "nashville": {
     "ytd": 31,
     "prior": 45,
     "asof": "2026-02-21",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "hartford": {
     "ytd": 4,
     "prior": 4,
     "asof": "2026-01-31",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "denver": {
     "ytd": 19,
     "prior": 24,
     "asof": "2026-02-23",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "portsmouth": {
     "ytd": 14,
     "prior": 13,
     "asof": "2026-03-01",
-    "fetchedAt": "2026-03-01T23:21:08.072Z",
+    "fetchedAt": "2026-03-01T23:45:17.808Z",
     "ok": true
   },
   "omaha": {
@@ -100,7 +100,7 @@
   },
   "wilmington": {
     "ok": false,
-    "error": "locator.getAttribute: Timeout 30000ms exceeded.\nCall log:\n  - waiting for locator('a[href*=\"showpublisheddocument/8310\"]').first()\n",
-    "fetchedAt": "2026-03-01T23:21:08.072Z"
+    "error": "Wilmington: could not find CompStat PDF link on page",
+    "fetchedAt": "2026-03-01T23:45:17.808Z"
   }
 }
