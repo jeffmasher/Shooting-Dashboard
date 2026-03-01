@@ -1023,30 +1023,7 @@ var CITIES = [
       } catch(e) { return null; }
     }
   },
-
-
-  {
-    id: 'hampton',
-    name: 'Hampton, VA',
-    note: 'Gunshot Injuries (Non-Fatal)',
-    type: 'Victims',
-    dataUrl: 'https://www.hampton.gov/DocumentCenter/View/31010/Gunshot-Injury-Data-?bidId=',
-    count: async function(s, e) {
-      var auto = await loadAutoData();
-      if (auto.hampton && auto.hampton.ok) {
-        var windowYear = parseInt(s.slice(0,4));
-        var asofYear = auto.hampton.asof ? parseInt(auto.hampton.asof.slice(0,4)) : CURRENT_YEAR;
-        return windowYear === asofYear ? auto.hampton.ytd : auto.hampton.prior;
-      }
-      return null;
-    },
-    latest: async function() {
-      var auto = await loadAutoData();
-      if (auto.hampton && auto.hampton.ok && auto.hampton.asof) return auto.hampton.asof;
-      return null;
-    }
-  },
-  {
+ {
     id: 'omaha',
     name: 'Omaha, NE',
     note: 'Homicides + Non-Fatal Shooting Victims (Gun)',
