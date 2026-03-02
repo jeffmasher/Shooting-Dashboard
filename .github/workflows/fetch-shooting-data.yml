@@ -6,9 +6,13 @@ on:
     - cron: '0 22 * * *'  # 4:00 PM UTC
   workflow_dispatch:          # Manual trigger from Actions tab
 
+defaults:
+  run:
+    shell: bash
+
 jobs:
   fetch-data:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, windows]
 
     permissions:
       contents: write
@@ -28,8 +32,8 @@ jobs:
       - name: Cache Playwright browsers
         uses: actions/cache@v4
         with:
-          path: ~/.cache/ms-playwright
-          key: playwright-chromium-${{ runner.os }}
+          path: ~/AppData/Local/ms-playwright
+          key: playwright-chromium-windows
           restore-keys: playwright-chromium-
 
       - name: Install Playwright Chromium
