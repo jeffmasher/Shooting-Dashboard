@@ -2030,39 +2030,67 @@ async function fetchWilmington() {
 
       const page = await browser.newPage();
 
-      await page.goto(PAGE_URL, { waitUntil: 'networkidle', timeout: 30000 });
+      // Intercept network requests BEFORE navigation to catch the PDF URL from embedded viewer
 
-      // Search full rendered HTML (handles JS-rendered content)
+      const interceptedUrls = [];
 
-      const html = await page.content();
+      page.on('request', req => {
 
-      console.log('Wilmington: Playwright HTML length:', html.length);
+        if (req.url().includes('showpublisheddocument/' + DOC_ID)) {
 
-      const htmlMatch = html.match(new RegExp('/home/showpublisheddocument/' + DOC_ID + '/(\\d+)', 'i'));
+          interceptedUrls.push(req.url());
 
-      if (htmlMatch) {
+        }
 
-        pdfUrl = 'https://www.wilmingtonde.gov/home/showpublisheddocument/' + DOC_ID + '/' + htmlMatch[1];
+      });
 
-        console.log('Wilmington: found PDF URL via Playwright HTML:', pdfUrl);
+      await page.goto(PAGE_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+
+      // Wait for lazy-loaded document viewer content
+
+      await page.waitForTimeout(8000);
+
+      console.log('Wilmington: intercepted URLs:', interceptedUrls);
+
+      if (interceptedUrls.length > 0) {
+
+        pdfUrl = interceptedUrls[0].startsWith('http') ? interceptedUrls[0] : 'https://www.wilmingtonde.gov' + interceptedUrls[0];
+
+        console.log('Wilmington: found PDF URL via request interception:', pdfUrl);
 
       } else {
 
-        // Log all showpublisheddocument links for diagnostics
+        // Fallback: search full rendered HTML
 
-        const links = await page.$$eval('a[href]', els => els.map(el => el.getAttribute('href') || ''));
+        const html = await page.content();
 
-        const docLinks = links.filter(l => l.includes('showpublisheddocument'));
+        console.log('Wilmington: Playwright HTML length:', html.length, '(first 500):', html.slice(0, 500));
 
-        console.log('Wilmington: showpublisheddocument links found:', docLinks);
+        const htmlMatch = html.match(new RegExp('/home/showpublisheddocument/' + DOC_ID + '/(\\d+)', 'i'));
 
-        const pdfLink = docLinks.find(l => l.includes('showpublisheddocument/' + DOC_ID));
+        if (htmlMatch) {
 
-        if (pdfLink) {
+          pdfUrl = 'https://www.wilmingtonde.gov/home/showpublisheddocument/' + DOC_ID + '/' + htmlMatch[1];
 
-          pdfUrl = pdfLink.startsWith('http') ? pdfLink : 'https://www.wilmingtonde.gov' + pdfLink;
+          console.log('Wilmington: found PDF URL via HTML search:', pdfUrl);
 
-          console.log('Wilmington: found PDF URL via link scan:', pdfUrl);
+        } else {
+
+          const links = await page.$$eval('a[href]', els => els.map(el => el.getAttribute('href') || ''));
+
+          const docLinks = links.filter(l => l.includes('showpublisheddocument'));
+
+          console.log('Wilmington: showpublisheddocument links:', docLinks);
+
+          const pdfLink = docLinks.find(l => l.includes('showpublisheddocument/' + DOC_ID));
+
+          if (pdfLink) {
+
+            pdfUrl = pdfLink.startsWith('http') ? pdfLink : 'https://www.wilmingtonde.gov' + pdfLink;
+
+            console.log('Wilmington: found PDF URL via link scan:', pdfUrl);
+
+          }
 
         }
 
